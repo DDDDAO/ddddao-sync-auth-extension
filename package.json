@@ -1,0 +1,28 @@
+{
+  "name": "ddddao-sync-auth-extension",
+  "version": "1.0.0",
+  "description": "DDDDAO Authentication Sync Extension",
+  "type": "module",
+  "scripts": {
+    "generate-icons": "node scripts/generate-icons.js",
+    "prebuild": "yarn generate-icons",
+    "build": "tsc && vite build",
+    "dev": "tsc && vite build --watch",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/chrome": "^0.0.260",
+    "axios": "^1.6.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "sharp": "^0.33.5",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.1"
+  }
+}
