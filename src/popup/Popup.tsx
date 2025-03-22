@@ -1,67 +1,92 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from "react";
+import { AuthService } from "../services/auth";
 
-interface AuthState {
-  isAuthenticated: boolean;
-  authToken?: string;
-}
-
-const Popup: React.FC = () => {
-  const [authState, setAuthState] = useState<AuthState>({
-    isAuthenticated: false,
-  });
+export default function Popup() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    // Check authentication status on mount
-    chrome.storage.local.get('authToken', ({ authToken }) => {
-      setAuthState({
-        isAuthenticated: !!authToken,
-        authToken,
-      });
-    });
+    checkSession();
   }, []);
 
-  const handleLogin = async () => {
-    // Open the login page in a new tab
-    chrome.tabs.create({
-      url: 'https://ddddao.xyz/login',
-    });
+  const checkSession = async () => {
+    const session = await AuthService.getCurrentSession();
+    setIsLoggedIn(!!session);
   };
 
-  const handleLogout = async () => {
-    // Clear the auth token
-    await chrome.storage.local.remove('authToken');
-    setAuthState({
-      isAuthenticated: false,
-    });
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      const success = await AuthService.login({ email, password });
+      if (success) {
+        setIsLoggedIn(true);
+        setEmail("");
+        setPassword("");
+      } else {
+        setError("Login failed. Please check your credentials.");
+      }
+    } catch (err) {
+      setError("An error occurred during login.");
+    }
   };
+
+  if (isLoggedIn) {
+    return (
+      <div className="p-4">
+        <h2 className="text-lg font-bold mb-4">Welcome to DDDD DAO</h2>
+        <p className="text-green-600">You are logged in!</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-[300px] p-4">
-      <h1 className="mb-4 text-xl font-bold">DDDD DAO Auth Sync</h1>
-
-      {authState.isAuthenticated ? (
+    <div className="p-4 w-80">
+      <h2 className="text-lg font-bold mb-4">Login to DDDD DAO</h2>
+      <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <p className="mb-4 text-green-600">✓ Connected to DDDD DAO</p>
-          <button
-            onClick={handleLogout}
-            className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600"
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700"
           >
-            Disconnect
-          </button>
+            Email
+          </label>
+          <input
+            type="email"
+            id="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          />
         </div>
-      ) : (
         <div>
-          <p className="mb-4 text-gray-600">Not connected to DDDD DAO</p>
-          <button
-            onClick={handleLogin}
-            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700"
           >
-            Connect
-          </button>
+            Password
+          </label>
+          <input
+            type="password"
+            id="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          />
         </div>
-      )}
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        <button
+          type="submit"
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          Sign in
+        </button>
+      </form>
     </div>
   );
-};
-
-export default Popup;
+}

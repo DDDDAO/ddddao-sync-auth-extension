@@ -19,13 +19,19 @@ export default defineConfig({
       output: {
         entryFileNames: "[name].js",
         assetFileNames: (assetInfo) => {
+          const info = assetInfo.name.split(".");
+          const extType = info[info.length - 1];
           if (assetInfo.name === "index.html") {
             return "popup.html";
+          }
+          if (extType === "css") {
+            return "assets/[name][extname]";
           }
           return "assets/[name]-[hash][extname]";
         },
       },
     },
+    cssCodeSplit: false,
   },
   publicDir: "public",
 });

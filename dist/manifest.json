@@ -8,7 +8,8 @@
     "*://*.binance.com/*",
     "*://*.suitechsui.online/*",
     "*://*.okx.com/*",
-    "*://*.bitget.com/*"
+    "*://*.bitget.com/*",
+    "*://*.ddddao.top/*"
   ],
   "action": {
     "default_popup": "src/popup/index.html",
