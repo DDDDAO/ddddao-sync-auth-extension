@@ -1,12 +1,9 @@
 // Function to get the current tab's domain
 function getCurrentTabDomain(callback: (domain: string | null) => void) {
-  console.log("Getting current tab domain...");
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    console.log("Active tabs:", tabs);
     if (tabs.length > 0 && tabs[0].url) {
       const url = new URL(tabs[0].url);
       const domain = url.hostname;
-      console.log("Successfully got domain:", domain);
       callback(domain);
     } else {
       console.warn("No active tab found");
@@ -17,8 +14,7 @@ function getCurrentTabDomain(callback: (domain: string | null) => void) {
 
 // Fetch cookies for the current tab's domain
 function fetchCookiesForCurrentTab() {
-  console.log("Fetching cookies for current tab...");
-  getCurrentTabDomain(function (domain: string | null) {
+  getCurrentTabDomain(function (domain) {
     if (domain) {
       console.log("Current tab domain:", domain);
 
@@ -35,7 +31,6 @@ function fetchCookiesForCurrentTab() {
 
 // Existing fetchCookiesForDomain function
 function fetchCookiesForDomain(domain: string) {
-  console.log("Fetching cookies for domain:", domain);
   chrome.cookies.getAll({ domain: domain }, function (cookies) {
     if (chrome.runtime.lastError) {
       console.error(
@@ -82,3 +77,18 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   { urls: ["https://www.binance.com/*", "https://www.suitechsui.online/*"] },
   ["requestHeaders"]
 );
+
+// Listen for messages from the popup
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === "GET_COOKIES") {
+    chrome.storage.local.get(null, (items) => {
+      // Filter only cookie entries
+      const cookieEntries = Object.entries(items).filter(([key]) =>
+        key.startsWith("cookies_")
+      );
+      const cookies = Object.fromEntries(cookieEntries);
+      sendResponse(cookies);
+    });
+    return true; // Will respond asynchronously
+  }
+});

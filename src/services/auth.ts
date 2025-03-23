@@ -1,3 +1,5 @@
+import { AuthMethodsResponse, Session } from "../types/auth";
+
 interface LoginCredentials {
   email: string;
   password: string;
@@ -41,9 +43,24 @@ export class AuthService {
     }
   }
 
-  static async getCurrentSession(): Promise<any> {
+  static async logout(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/api/auth/session`);
+      const response = await fetch(`${this.API_BASE_URL}/api/auth/signout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      return response.ok;
+    } catch (error) {
+      console.error("Logout error:", error);
+      return false;
+    }
+  }
+
+  static async getCurrentSession(): Promise<Session | null> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/api/auth/session`, {
+        credentials: "include",
+      });
       if (!response.ok) {
         throw new Error("Failed to get session");
       }
@@ -51,6 +68,67 @@ export class AuthService {
     } catch (error) {
       console.error("Session error:", error);
       return null;
+    }
+  }
+
+  static async getAuthMethods(): Promise<AuthMethodsResponse | null> {
+    try {
+      const response = await fetch(
+        `${this.API_BASE_URL}/api/user-auth-methods`,
+        {
+          credentials: "include",
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to get auth methods");
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Auth methods error:", error);
+      return null;
+    }
+  }
+
+  static async deleteAuthMethod(id: number): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `${this.API_BASE_URL}/api/user-auth-methods/${id}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+      return response.ok;
+    } catch (error) {
+      console.error("Delete auth method error:", error);
+      return false;
+    }
+  }
+
+  static async updateAuthMethodFromBackground(id: number): Promise<boolean> {
+    try {
+      // Get the cookies from background script
+      const cookies = await chrome.runtime.sendMessage({ type: "GET_COOKIES" });
+
+      if (!cookies) {
+        throw new Error("No cookies found");
+      }
+
+      const response = await fetch(
+        `${this.API_BASE_URL}/api/user-auth-methods/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ cookies }),
+          credentials: "include",
+        }
+      );
+      return response.ok;
+    } catch (error) {
+      console.error("Update auth method error:", error);
+      return false;
     }
   }
 }

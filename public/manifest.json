@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DDDD DAO Auth Sync",
+  "name": "DDDDDAO Auth Sync",
   "version": "1.0.0",
-  "description": "Sync authentication cookies with DDDD DAO platform",
+  "description": "Sync authentication cookies with DDDDDAO platform",
   "permissions": ["cookies", "storage", "activeTab", "webRequest"],
   "host_permissions": [
     "*://*.binance.com/*",
