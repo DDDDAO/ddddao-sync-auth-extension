@@ -162,11 +162,12 @@ export class AuthService {
     try {
       console.log("[AuthService] Deleting auth method:", id);
       const response = await fetch(
-        `${this.API_BASE_URL}/api/user-auth-methods/${id}`,
+        `${this.API_BASE_URL}/api/user-auth-methods`,
         {
           method: "DELETE",
           credentials: "include",
           body: JSON.stringify({
+            id,
             platform,
           }),
           headers: {
