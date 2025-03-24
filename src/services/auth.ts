@@ -194,16 +194,22 @@ export class AuthService {
   ): Promise<boolean> {
     try {
       console.log("[AuthService] Syncing auth method:", platform, token);
+      const payload = {
+        id: linkedId,
+        platform,
+        value: token,
+      };
+      console.log(
+        "[AuthService] Request payload:",
+        JSON.stringify(payload, null, 2)
+      );
+
       const response = await fetch(
         `${this.API_BASE_URL}/api/user-auth-methods`,
         {
-          method: linkedId ? "PUT" : "POST",
+          method: linkedId === undefined ? "POST" : "PUT",
           credentials: "include",
-          body: JSON.stringify({
-            id: linkedId,
-            platform,
-            value: token,
-          }),
+          body: JSON.stringify(payload),
           headers: {
             "Content-Type": "application/json",
           },

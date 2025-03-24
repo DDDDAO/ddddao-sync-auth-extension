@@ -9,7 +9,7 @@ import {
 import { Badge } from "../../components/ui/badge";
 import { DDCookie, EnumPlatform } from "../../types/auth";
 import { cn, obfuscate } from "@/lib/utils";
-import { CheckIcon, Edit3Icon, XIcon } from "lucide-react";
+import { CheckIcon, XIcon } from "lucide-react";
 import { IconButton } from "@/components/ui/button";
 
 interface AuthMethodsListProps {

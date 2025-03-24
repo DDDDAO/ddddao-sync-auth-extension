@@ -107,8 +107,23 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     console.log("[loadAll] Profile ID:", profile.id);
     // Load linked statuses for this profile
     chrome.storage.local.get(`${profile.id}:linkedAuthMethods`, (result) => {
+      console.log("[loadAll] Linked statuses:", result);
       if (result[`${profile.id}:linkedAuthMethods`]) {
-        setLinkedStatuses(result[`${profile.id}:linkedAuthMethods`]);
+        // clear linked statuses whose id+platform is not in authMethods
+        const filteredLinkedStatuses = Object.fromEntries(
+          Object.entries(result[`${profile.id}:linkedAuthMethods`]).filter(
+            ([key]) => authMethods.some((m) => m.id === parseInt(key))
+          )
+        );
+        console.log(
+          "[loadAll] Filtered linked statuses:",
+          filteredLinkedStatuses
+        );
+        setLinkedStatuses(filteredLinkedStatuses);
+        // set back to chrome storage
+        chrome.storage.local.set({
+          [`${profile.id}:linkedAuthMethods`]: filteredLinkedStatuses,
+        });
       }
     });
     fetchData();
