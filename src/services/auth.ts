@@ -10,11 +10,18 @@ export class AuthService {
 
   static async login(credentials: LoginCredentials): Promise<boolean> {
     try {
+      console.log("[AuthService] Starting login process...");
+
       // First, get the CSRF token
-      const csrfResponse = await fetch(`${this.API_BASE_URL}/api/auth/csrf`);
+      console.log("[AuthService] Fetching CSRF token...");
+      const csrfResponse = await fetch(`${this.API_BASE_URL}/api/auth/csrf`, {
+        credentials: "include",
+      });
       const { csrfToken } = await csrfResponse.json();
+      console.log("[AuthService] Got CSRF token:", csrfToken);
 
       // Then, perform the login
+      console.log("[AuthService] Attempting login with credentials...");
       const response = await fetch(
         `${this.API_BASE_URL}/api/auth/callback/credentials`,
         {
@@ -22,6 +29,7 @@ export class AuthService {
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include",
           body: JSON.stringify({
             ...credentials,
             csrfToken,
@@ -32,65 +40,125 @@ export class AuthService {
       );
 
       if (!response.ok) {
+        console.error(
+          "[AuthService] Login failed with status:",
+          response.status
+        );
         throw new Error("Login failed");
       }
 
       const data = await response.json();
-      return data.url.includes("error") ? false : true;
+      console.log("[AuthService] Login response:", data);
+      return data;
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("[AuthService] Login error:", error);
       return false;
     }
   }
 
   static async logout(): Promise<boolean> {
     try {
+      console.log("[AuthService] Starting logout process...");
+
       const response = await fetch(`${this.API_BASE_URL}/api/auth/signout`, {
         method: "POST",
         credentials: "include",
       });
+
+      console.log("[AuthService] Logout response status:", response.status);
+
+      // Clear all cookies for the domain
+      const cookies = await chrome.cookies.getAll({ domain: "ddddao.top" });
+      console.log("[AuthService] Found cookies to remove:", cookies.length);
+
+      for (const cookie of cookies) {
+        await chrome.cookies.remove({
+          url: `${this.API_BASE_URL}${cookie.path}`,
+          name: cookie.name,
+        });
+      }
+
+      // Clear local storage
+      localStorage.clear();
+
+      // Clear session storage
+      sessionStorage.clear();
+
       return response.ok;
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("[AuthService] Logout error:", error);
       return false;
     }
   }
 
   static async getCurrentSession(): Promise<Session | null> {
     try {
+      console.log("[AuthService] Checking current session...");
       const response = await fetch(`${this.API_BASE_URL}/api/auth/session`, {
         credentials: "include",
       });
+
+      console.log(
+        "[AuthService] Session check response status:",
+        response.status
+      );
+
       if (!response.ok) {
+        console.error("[AuthService] Failed to get session:", response.status);
         throw new Error("Failed to get session");
       }
-      return await response.json();
+
+      const session = await response.json();
+      console.log("[AuthService] Current session:", session);
+
+      // Check if session is empty or doesn't have required user data
+      if (!session || !session.user || !session.user.email) {
+        console.log("[AuthService] No valid session found");
+        return null;
+      }
+
+      return session;
     } catch (error) {
-      console.error("Session error:", error);
+      console.error("[AuthService] Session check error:", error);
       return null;
     }
   }
 
   static async getAuthMethods(): Promise<AuthMethodsResponse | null> {
     try {
+      console.log("[AuthService] Fetching auth methods...");
       const response = await fetch(
         `${this.API_BASE_URL}/api/user-auth-methods`,
         {
           credentials: "include",
         }
       );
+
+      console.log(
+        "[AuthService] Auth methods response status:",
+        response.status
+      );
+
       if (!response.ok) {
+        console.error(
+          "[AuthService] Failed to get auth methods:",
+          response.status
+        );
         throw new Error("Failed to get auth methods");
       }
-      return await response.json();
+
+      const data = await response.json();
+      console.log("[AuthService] Auth methods data:", data);
+      return data;
     } catch (error) {
-      console.error("Auth methods error:", error);
+      console.error("[AuthService] Auth methods error:", error);
       return null;
     }
   }
 
   static async deleteAuthMethod(id: number): Promise<boolean> {
     try {
+      console.log("[AuthService] Deleting auth method:", id);
       const response = await fetch(
         `${this.API_BASE_URL}/api/user-auth-methods/${id}`,
         {
@@ -98,22 +166,31 @@ export class AuthService {
           credentials: "include",
         }
       );
+
+      console.log(
+        "[AuthService] Delete auth method response status:",
+        response.status
+      );
       return response.ok;
     } catch (error) {
-      console.error("Delete auth method error:", error);
+      console.error("[AuthService] Delete auth method error:", error);
       return false;
     }
   }
 
   static async updateAuthMethodFromBackground(id: number): Promise<boolean> {
     try {
+      console.log("[AuthService] Starting auth method update process...");
       // Get the cookies from background script
       const cookies = await chrome.runtime.sendMessage({ type: "GET_COOKIES" });
+      console.log("[AuthService] Got cookies from background:", cookies);
 
       if (!cookies) {
+        console.error("[AuthService] No cookies found in background");
         throw new Error("No cookies found");
       }
 
+      console.log("[AuthService] Updating auth method with new cookies...");
       const response = await fetch(
         `${this.API_BASE_URL}/api/user-auth-methods/${id}`,
         {
@@ -121,13 +198,18 @@ export class AuthService {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ cookies }),
           credentials: "include",
+          body: JSON.stringify({ cookies }),
         }
+      );
+
+      console.log(
+        "[AuthService] Update auth method response status:",
+        response.status
       );
       return response.ok;
     } catch (error) {
-      console.error("Update auth method error:", error);
+      console.error("[AuthService] Update auth method error:", error);
       return false;
     }
   }
