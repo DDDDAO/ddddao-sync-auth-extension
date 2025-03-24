@@ -29,6 +29,9 @@ export function LoginForm({
 }: LoginFormProps) {
   return (
     <div className="grid gap-6">
+      <div className="flex justify-left">
+        <img src="/logo-text.svg" alt="logo" className="w-24" />
+      </div>
       <div className="flex flex-col space-y-2 text-center font-theo">
         <h1 className="text-lg font-semibold tracking-tight md:text-2xl">
           Login with email

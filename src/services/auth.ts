@@ -39,7 +39,8 @@ export class AuthService {
         }
       );
 
-      if (!response.ok) {
+      // 302 Found is expected and indicates a successful login with redirect
+      if (!response.ok && response.status !== 302) {
         console.error(
           "[AuthService] Login failed with status:",
           response.status
@@ -47,9 +48,7 @@ export class AuthService {
         throw new Error("Login failed");
       }
 
-      const data = await response.json();
-      console.log("[AuthService] Login response:", data);
-      return data;
+      return true;
     } catch (error) {
       console.error("[AuthService] Login error:", error);
       return false;

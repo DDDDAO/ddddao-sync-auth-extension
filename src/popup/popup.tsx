@@ -66,6 +66,7 @@ export default function Popup() {
 
     try {
       const success = await AuthService.login({ email, password });
+      console.log("[Popup] Login response:", success);
       if (success) {
         const sessionData = await AuthService.getCurrentSession();
         if (sessionData) {

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { col, row } from "@/components/ui/_ui-fixed";
 import { cn, obfuscate } from "@/lib/utils";
+import CopyButton from "./copy-button";
 
 interface Cookie {
   domain: string;
@@ -121,13 +122,31 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
 
   // DO NOT UPDATE LINKED STATUSES HERE
   useEffect(() => {
-    if (!profileId) return;
+    if (!profileId || !authMethods.length) return;
     //when profile changes, refresh linked statuses
     // Load linked statuses for this profile
     chrome.storage.local.get([getStorageKey("linkedAuthMethods")], (result) => {
       const key = getStorageKey("linkedAuthMethods");
       if (result[key]) {
-        setLinkedStatuses(result[key]);
+        console.log(
+          "[BackgroundFetchedCookiesOrJwtTokenList] Linked statuses:",
+          result[key]
+        );
+        // filter out auth methods that are not in the authMethods array
+        const filteredLinkedStatuses = Object.fromEntries(
+          Object.entries(result[key]).filter(([key]) =>
+            authMethods.some((m) => m.id === parseInt(key))
+          )
+        );
+        console.log(
+          "[BackgroundFetchedCookiesOrJwtTokenList] Filtered linked statuses:",
+          filteredLinkedStatuses
+        );
+        setLinkedStatuses(filteredLinkedStatuses);
+        // set back to chrome storage
+        chrome.storage.local.set({
+          [getStorageKey("linkedAuthMethods")]: filteredLinkedStatuses,
+        });
       }
     });
   }, [profileId]);
@@ -241,6 +260,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
+          {str && <CopyButton contentToCopy={str} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
@@ -290,6 +310,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
+          {okxToken && <CopyButton contentToCopy={okxToken} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
@@ -338,6 +359,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
+          {bitgetToken && <CopyButton contentToCopy={bitgetToken} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
