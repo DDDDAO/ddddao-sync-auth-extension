@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AuthService } from "../services/auth";
-import { DDCookie, Session } from "../types/auth";
+import { DDCookie, EnumPlatform, Session } from "../types/auth";
 import { Alert } from "./components/alert";
 import { Button } from "../components/ui/button";
 import { LoginForm } from "./components/login-form";
@@ -119,7 +119,7 @@ export default function Popup() {
     });
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number, platform: EnumPlatform) => {
     showAlert({
       title: "Confirm Deletion",
       message: "Are you sure you want to delete this authentication method?",
@@ -127,7 +127,7 @@ export default function Popup() {
       onConfirm: async () => {
         setActionLoading(id);
         try {
-          const success = await AuthService.deleteAuthMethod(id);
+          const success = await AuthService.deleteAuthMethod(id, platform);
           if (success) {
             await fetchAuthMethods();
             showAlert({

@@ -155,7 +155,10 @@ export class AuthService {
     }
   }
 
-  static async deleteAuthMethod(id: number): Promise<boolean> {
+  static async deleteAuthMethod(
+    id: number,
+    platform: EnumPlatform
+  ): Promise<boolean> {
     try {
       console.log("[AuthService] Deleting auth method:", id);
       const response = await fetch(
@@ -163,6 +166,12 @@ export class AuthService {
         {
           method: "DELETE",
           credentials: "include",
+          body: JSON.stringify({
+            platform,
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
       );
 

@@ -7,7 +7,7 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import { DDCookie } from "../../types/auth";
+import { DDCookie, EnumPlatform } from "../../types/auth";
 import { cn, obfuscate } from "@/lib/utils";
 import { CheckIcon, Edit3Icon, XIcon } from "lucide-react";
 import { IconButton } from "@/components/ui/button";
@@ -16,7 +16,7 @@ interface AuthMethodsListProps {
   methods: DDCookie[];
   actionLoading: number | null;
   onUpdate: (id: number) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number, platform: EnumPlatform) => void;
 }
 
 const JsonDisplay = ({ data }: { data: Record<string, any> | string }) => {
@@ -140,7 +140,7 @@ export function AuthMethodsList({
               <JsonDisplay data={dc.metadata as Record<string, any>} />
             </TableCell>
             <TableCell>
-              <IconButton onClick={() => onDelete(dc.id)}>
+              <IconButton onClick={() => onDelete(dc.id, dc.platform)}>
                 <XIcon />
               </IconButton>
             </TableCell>
