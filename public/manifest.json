@@ -16,6 +16,7 @@
     "*://*.suitechsui.online/*",
     "*://*.okx.com/*",
     "*://*.bitget.com/*",
+    "*://*.bitgetapps.com/*",
     "*://*.ddddao.top/*"
   ],
   "action": {

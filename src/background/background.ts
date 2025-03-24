@@ -22,7 +22,8 @@ function fetchCookiesForCurrentTab() {
         domain.includes("binance.com") ||
         domain.includes("suitechsui.online") ||
         domain.includes("okx.com") ||
-        domain.includes("bitget.com")
+        domain.includes("bitget.com") ||
+        domain.includes("bitgetapps.com")
       ) {
         fetchCookiesForDomain(domain);
       } else {
@@ -59,7 +60,10 @@ function fetchCookiesForDomain(domain: string) {
         console.log("OKX JWT Token Found in cookies");
         chrome.storage.local.set({ okx_jwt: jwtCookie.value });
       }
-    } else if (domain.includes("bitget.com")) {
+    } else if (
+      domain.includes("bitget.com") ||
+      domain.includes("bitgetapps.com")
+    ) {
       const jwtCookie = cookies.find(
         (cookie) => cookie.name === "bt_newsessionid"
       );
@@ -133,7 +137,8 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
       details.url.includes("binance.com") ||
       details.url.includes("suitechsui.online") ||
       details.url.includes("okx.com") ||
-      details.url.includes("bitget.com")
+      details.url.includes("bitget.com") ||
+      details.url.includes("bitgetapps.com")
     ) {
       fetchCookiesForCurrentTab();
     }
@@ -141,8 +146,10 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   {
     urls: [
       "https://www.binance.com/*",
+      "https://www.suitechsui.online/*",
       "https://www.okx.com/*",
       "https://www.bitget.com/*",
+      "https://www.bitgetapps.com/*",
     ],
   },
   ["requestHeaders"]
