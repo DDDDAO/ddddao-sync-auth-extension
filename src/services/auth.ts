@@ -1,4 +1,4 @@
-import { AuthMethodsResponse, Session } from "../types/auth";
+import { AuthMethodsResponse, EnumPlatform, Session } from "../types/auth";
 
 interface LoginCredentials {
   email: string;
@@ -178,38 +178,27 @@ export class AuthService {
     }
   }
 
-  static async updateAuthMethodFromBackground(id: number): Promise<boolean> {
+  static async sync(platform: EnumPlatform, token: string): Promise<boolean> {
     try {
-      console.log("[AuthService] Starting auth method update process...");
-      // Get the cookies from background script
-      const cookies = await chrome.runtime.sendMessage({ type: "GET_COOKIES" });
-      console.log("[AuthService] Got cookies from background:", cookies);
-
-      if (!cookies) {
-        console.error("[AuthService] No cookies found in background");
-        throw new Error("No cookies found");
-      }
-
-      console.log("[AuthService] Updating auth method with new cookies...");
+      console.log("[AuthService] Syncing auth method:", platform, token);
       const response = await fetch(
-        `${this.API_BASE_URL}/api/user-auth-methods/${id}`,
+        `${this.API_BASE_URL}/api/user-auth-methods`,
         {
-          method: "PUT",
+          method: "POST",
+          credentials: "include",
+          body: JSON.stringify({ platform, token }),
           headers: {
             "Content-Type": "application/json",
           },
-          credentials: "include",
-          body: JSON.stringify({ cookies }),
         }
       );
-
       console.log(
-        "[AuthService] Update auth method response status:",
+        "[AuthService] Sync auth method response status:",
         response.status
       );
       return response.ok;
     } catch (error) {
-      console.error("[AuthService] Update auth method error:", error);
+      console.error("[AuthService] Sync error:", error);
       return false;
     }
   }

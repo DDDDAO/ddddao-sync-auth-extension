@@ -7,8 +7,8 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import { DDCookie, EnumPlatform } from "../../types/auth";
-import { cn } from "@/lib/utils";
+import { DDCookie } from "../../types/auth";
+import { cn, obfuscate } from "@/lib/utils";
 import { CheckIcon, Edit3Icon, XIcon } from "lucide-react";
 import { IconButton } from "@/components/ui/button";
 
@@ -81,6 +81,7 @@ export function AuthMethodsList({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>id</TableHead>
           <TableHead>platform</TableHead>
           <TableHead>status</TableHead>
           <TableHead>updatedAt</TableHead>
@@ -93,6 +94,7 @@ export function AuthMethodsList({
       <TableBody>
         {methods.map((dc) => (
           <TableRow key={dc.id}>
+            <TableCell>{dc.id}</TableCell>
             <TableCell>{dc.platform}</TableCell>
 
             <TableCell>
@@ -132,15 +134,12 @@ export function AuthMethodsList({
             </TableCell>
 
             <TableCell>
-              <JsonDisplay data={dc.value} />
+              <div className="break-all">{obfuscate(dc.value)}</div>
             </TableCell>
             <TableCell>
               <JsonDisplay data={dc.metadata as Record<string, any>} />
             </TableCell>
             <TableCell>
-              <IconButton onClick={() => onUpdate(dc.id)}>
-                <Edit3Icon />
-              </IconButton>
               <IconButton onClick={() => onDelete(dc.id)}>
                 <XIcon />
               </IconButton>

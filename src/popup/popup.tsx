@@ -155,46 +155,8 @@ export default function Popup() {
     });
   };
 
-  const handleUpdate = async (id: number) => {
-    showAlert({
-      title: "Confirm Update",
-      message:
-        "Are you sure you want to update this authentication method with the current cookies?",
-      type: "confirm",
-      onConfirm: async () => {
-        setActionLoading(id);
-        try {
-          const success = await AuthService.updateAuthMethodFromBackground(id);
-          if (success) {
-            await fetchAuthMethods();
-            showAlert({
-              title: "Success",
-              message: "Authentication method updated successfully",
-              type: "info",
-            });
-          } else {
-            showAlert({
-              title: "Error",
-              message: "Failed to update authentication method",
-              type: "error",
-            });
-          }
-        } catch (err) {
-          showAlert({
-            title: "Error",
-            message:
-              "An error occurred while updating the authentication method",
-            type: "error",
-          });
-        } finally {
-          setActionLoading(null);
-        }
-      },
-    });
-  };
-
   return (
-    <div className="min-w-[400px] p-4">
+    <div className="min-w-[400px] p-8">
       {loading ? (
         <div className="flex justify-center items-center h-32">
           <div className="translate-x-1">
@@ -215,12 +177,12 @@ export default function Popup() {
             </Button>
           </div>
 
-          <BackgroundFetchedCookiesOrJwtTokenList />
+          <BackgroundFetchedCookiesOrJwtTokenList authMethods={authMethods} />
 
           <AuthMethodsList
             methods={authMethods}
             actionLoading={actionLoading}
-            onUpdate={handleUpdate}
+            onUpdate={() => {}}
             onDelete={handleDelete}
           />
         </div>

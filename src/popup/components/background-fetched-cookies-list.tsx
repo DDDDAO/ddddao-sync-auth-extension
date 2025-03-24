@@ -1,14 +1,33 @@
 import { useEffect, useState } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../components/ui/table";
-import { Badge } from "../../components/ui/badge";
-import { ScrollArea } from "../../components/ui/scroll-area";
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { EnumPlatform, DDCookie } from "@/types/auth";
+import { AuthService } from "@/services/auth";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { col, row } from "@/components/ui/_ui-fixed";
+import { cn, obfuscate } from "@/lib/utils";
 
 interface Cookie {
   domain: string;
@@ -27,12 +46,36 @@ interface JwtToken {
   domain: string;
 }
 
-export function BackgroundFetchedCookiesOrJwtTokenList() {
+interface BackgroundFetchedCookiesOrJwtTokenListProps {
+  authMethods: DDCookie[];
+}
+
+export function BackgroundFetchedCookiesOrJwtTokenList({
+  authMethods,
+}: BackgroundFetchedCookiesOrJwtTokenListProps) {
   const [cookies, setCookies] = useState<StorageData>({});
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [jwtTokens, setJwtTokens] = useState<{ [key: string]: string }>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState<EnumPlatform | null>(
+    null
+  );
+  const [selectedToken, setSelectedToken] = useState<string>("");
+  const [selectedAuthMethod, setSelectedAuthMethod] = useState<DDCookie | null>(
+    null
+  );
+  const [linkedStatuses, setLinkedStatuses] = useState<{
+    [key in EnumPlatform]?: number;
+  }>({});
 
   useEffect(() => {
+    // Load linked statuses from storage
+    chrome.storage.local.get(["linkedAuthMethods"], (result) => {
+      if (result.linkedAuthMethods) {
+        setLinkedStatuses(result.linkedAuthMethods);
+      }
+    });
+
     const fetchData = async () => {
       // Get cookies and CSRF token
       const response = await chrome.runtime.sendMessage({
@@ -64,134 +107,305 @@ export function BackgroundFetchedCookiesOrJwtTokenList() {
     return () => clearInterval(interval);
   }, []);
 
-  const hasBinanceCookies = Object.keys(cookies).some((key) =>
-    key.includes("binance")
-  );
-  const hasJwtTokens = Object.keys(jwtTokens).length > 0;
+  // Update linked statuses when auth methods change
+  useEffect(() => {
+    const newLinkedStatuses: { [key in EnumPlatform]?: number } = {};
+    authMethods.forEach((method) => {
+      if (method.active) {
+        newLinkedStatuses[method.platform] = method.id;
+      }
+    });
+    setLinkedStatuses(newLinkedStatuses);
+    chrome.storage.local.set({ linkedAuthMethods: newLinkedStatuses });
+  }, [authMethods]);
 
-  if (!hasBinanceCookies && !hasJwtTokens) {
+  const sync = async (platform: EnumPlatform, token: string) => {
+    try {
+      if (!linkedStatuses[platform]) {
+        toast.error("Please link an auth method first");
+        return;
+      }
+      const success = await AuthService.sync(platform, token);
+      if (success) {
+        toast.success("Synced successfully");
+      } else {
+        toast.error("Sync failed");
+      }
+    } catch (error) {
+      console.error("sync", error);
+      toast.error("Sync failed with uncaught error");
+    }
+  };
+
+  const openSyncDialog = (platform: EnumPlatform, token: string) => {
+    setSelectedPlatform(platform);
+    setSelectedToken(token);
+    setDialogOpen(true);
+  };
+
+  const handleSync = async () => {
+    if (!selectedPlatform || !selectedToken) return;
+
+    if (selectedAuthMethod) {
+      // Link to selected auth method
+      const newLinkedStatuses = {
+        ...linkedStatuses,
+        [selectedPlatform]: selectedAuthMethod.id,
+      };
+      setLinkedStatuses(newLinkedStatuses);
+      chrome.storage.local.set({ linkedAuthMethods: newLinkedStatuses });
+      toast.success("Linked successfully");
+    } else {
+      // Create new auth method
+      await sync(selectedPlatform, selectedToken);
+    }
+
+    setDialogOpen(false);
+    setSelectedPlatform(null);
+    setSelectedToken("");
+    setSelectedAuthMethod(null);
+  };
+
+  const toCopiedString = (cookie: string, csrfToken: string) => {
+    if (!cookie || !csrfToken) {
+      return "NO COOKIE OR CSRF TOKEN";
+    }
+    return `csrfToken=${csrfToken}&p20t=${cookie}`;
+  };
+
+  const binanceCard = () => {
+    const binanceCookies =
+      cookies["cookies_www.suitechsui.online"] ||
+      cookies["cookies_www.binance.com"] ||
+      [];
+    const str = toCopiedString(binanceCookies[0]?.value || "", csrfToken || "");
+    const displayStr = toCopiedString(
+      obfuscate(binanceCookies[0]?.value) || "",
+      obfuscate(csrfToken) || ""
+    );
+    const linkedId = linkedStatuses[EnumPlatform.BINANCE];
+    const linkedMethod = authMethods.find((m) => m.id === linkedId);
+
     return (
-      <div className="text-sm text-muted-foreground mb-4">
-        No authentication data found in background storage
+      <Card>
+        <CardHeader>
+          <CardTitle>Binance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-xs break-all">{displayStr}</div>
+          {linkedMethod && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span className="text-green-400">Linked</span>
+              <div className="grid grid-cols-2">
+                {col("ID", linkedMethod.id)}
+                {col("Nickname", linkedMethod.metadata["nickname"])}
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => sync(EnumPlatform.BINANCE, str)}
+            disabled={!linkedId || !str}
+          >
+            Sync
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openSyncDialog(EnumPlatform.BINANCE, str)}
+            disabled={!linkedId || !str}
+          >
+            {linkedId ? "Relink" : "Link"}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  const okxCard = () => {
+    const okxToken = jwtTokens["okx"] || "";
+    const linkedId = linkedStatuses[EnumPlatform.OKX];
+    const linkedMethod = authMethods.find((m) => m.id === linkedId);
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>OKX</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="break-all">
+            {obfuscate(okxToken) || "NO OKX TOKEN"}
+          </div>
+          {linkedMethod && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span className="text-green-400">Linked</span>
+              <div className="grid grid-cols-2 gap-2">
+                {col("ID", linkedMethod.id)}
+                {col("Nickname", linkedMethod.metadata["nickname"])}
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => sync(EnumPlatform.OKX, okxToken)}
+            disabled={!linkedId || !okxToken}
+          >
+            Sync
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!linkedId || !okxToken}
+            onClick={() => openSyncDialog(EnumPlatform.OKX, okxToken)}
+          >
+            {linkedId ? "Relink" : "Link"}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  const bitgetCard = () => {
+    const bitgetToken = jwtTokens["bitget"] || "";
+    const linkedId = linkedStatuses[EnumPlatform.BITGET];
+    const linkedMethod = authMethods.find((m) => m.id === linkedId);
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Bitget</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="break-all">
+            {obfuscate(bitgetToken) || "NO BITGET TOKEN"}
+          </div>
+          {linkedMethod && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span className="text-green-400">Linked</span>
+              <div className="grid grid-cols-2 gap-2">
+                {col("ID", linkedMethod.id)}
+                {col("Nickname", linkedMethod.metadata["nickname"])}
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => sync(EnumPlatform.BITGET, bitgetToken)}
+            disabled={!linkedId || !bitgetToken}
+          >
+            Sync
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!linkedId || !bitgetToken}
+            onClick={() => openSyncDialog(EnumPlatform.BITGET, bitgetToken)}
+          >
+            {linkedId ? "Relink" : "Link"}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
+  const renderAuthMethodInfo = (
+    method: DDCookie | null,
+    singleLine = false
+  ) => {
+    if (!method) return null;
+    if (singleLine) {
+      return (
+        <div className="flex">
+          {`ID: ${method.id} - ${method.metadata["nickname"]}`}
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-1">
+        {row("ID", method.id)}
+        {row("Nickname", method.metadata["nickname"])}
+        {row(
+          "Status",
+          <span
+            className={cn({
+              "text-green-400": method.active,
+              "text-red-400": !method.active,
+            })}
+          >
+            {method.active ? "Active" : "Inactive"}
+          </span>
+        )}
       </div>
     );
-  }
+  };
 
   return (
     <div className="mb-4 space-y-4">
-      {/* Binance Section */}
-      {hasBinanceCookies && (
-        <div>
-          <h3 className="text-sm font-medium mb-2">Binance Authentication</h3>
-          <ScrollArea className="h-[200px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Expiration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* CSRF Token Row */}
-                {csrfToken && (
-                  <TableRow>
-                    <TableCell>
-                      <Badge variant="secondary">CSRF Token</Badge>
-                    </TableCell>
-                    <TableCell className="font-mono">csrftoken</TableCell>
-                    <TableCell>
-                      <div className="font-mono text-xs max-w-48 truncate">
-                        {csrfToken}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-muted-foreground">-</span>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {/* Cookie Rows */}
-                {Object.entries(cookies)
-                  .filter(([domain]) => domain.includes("binance"))
-                  .map(([domain, cookieList]) =>
-                    cookieList.map((cookie, index) => (
-                      <TableRow key={`${domain}-${cookie.name}-${index}`}>
-                        <TableCell>
-                          <Badge variant="outline">Cookie</Badge>
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          {cookie.name}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-mono text-xs max-w-48 truncate">
-                            {cookie.value}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {cookie.expirationDate ? (
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(
-                                cookie.expirationDate * 1000
-                              ).toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Session
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </div>
-      )}
-
-      {/* JWT Tokens Section */}
-      {hasJwtTokens && (
-        <div>
-          <h3 className="text-sm font-medium mb-2">JWT Tokens</h3>
-          <ScrollArea className="h-[100px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Platform</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Token</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(jwtTokens).map(([domain, token]) => (
-                  <TableRow key={domain}>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono capitalize">
-                        {domain}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {domain === "okx" ? (
-                        <span>Cookie: 'token'</span>
-                      ) : domain === "bitget" ? (
-                        <span>Cookie: 'bt_newsessionid'</span>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-mono text-xs max-w-96 truncate">
-                        {token}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </div>
-      )}
+      <p className="text-sm text-gray-500">
+        The cookies here are fetched from your current tab every 5 seconds.
+      </p>
+      <div className="grid grid-cols-2 gap-4">
+        {binanceCard()}
+        {okxCard()}
+        {bitgetCard()}
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAuthMethod ? "Link to Existing Auth" : "Create New Auth"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedAuthMethod
+                ? "Link your cookies to an existing auth method."
+                : "Create a new auth method with your cookies."}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPlatform && (
+            <Select
+              value={selectedAuthMethod?.id?.toString()}
+              onValueChange={(value) => {
+                const method = authMethods.find(
+                  (m) => m.id.toString() === value
+                );
+                setSelectedAuthMethod(method || null);
+              }}
+            >
+              <SelectTrigger className="h-auto">
+                <SelectValue placeholder="Select Auth ID">
+                  {renderAuthMethodInfo(selectedAuthMethod, true)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {authMethods
+                  .filter((method) => method.platform === selectedPlatform)
+                  .map((method) => (
+                    <SelectItem key={method.id} value={method.id.toString()}>
+                      {renderAuthMethodInfo(method)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSync}>
+              {selectedAuthMethod ? "Link" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

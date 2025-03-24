@@ -4,9 +4,9 @@ export interface CommonResp {
 }
 
 export enum EnumPlatform {
-  BINANCE = "BINANCE",
-  OKX = "OKX",
-  BITGET = "BITGET",
+  BINANCE = "Binance",
+  OKX = "Okx",
+  BITGET = "Bitget",
 }
 
 export interface CookieMetadata {
