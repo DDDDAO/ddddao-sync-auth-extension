@@ -204,7 +204,12 @@ export class AuthService {
         "[AuthService] Sync auth method response status:",
         response.status
       );
-      return response.ok;
+      const data = await response.json();
+      console.log("[AuthService] Sync auth method response data:", data);
+      if (data.success) {
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error("[AuthService] Sync error:", error);
       return false;

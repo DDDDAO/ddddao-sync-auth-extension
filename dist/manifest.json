@@ -1,9 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "DDDDAO Auth Sync",
+  "name": "DDDDDAO Auth Sync",
   "version": "1.0.0",
-  "description": "Sync authentication cookies with DDDDAO platform",
-  "permissions": ["cookies", "storage", "activeTab", "webRequest"],
+  "description": "Sync authentication cookies with DDDDDAO platform",
+  "permissions": [
+    "cookies",
+    "storage",
+    "activeTab",
+    "webRequest",
+    "identity",
+    "identity.email"
+  ],
   "host_permissions": [
     "*://*.binance.com/*",
     "*://*.suitechsui.online/*",

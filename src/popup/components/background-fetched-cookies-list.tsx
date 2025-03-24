@@ -67,57 +67,70 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
   const [linkedStatuses, setLinkedStatuses] = useState<{
     [key in EnumPlatform]?: number;
   }>({});
+  const [profileId, setProfileId] = useState<string>("");
+  const [fetching, setFetching] = useState(false);
+  const getStorageKey = (key: string) => `${profileId}:${key}`;
 
-  useEffect(() => {
-    // Load linked statuses from storage
-    chrome.storage.local.get(["linkedAuthMethods"], (result) => {
-      if (result.linkedAuthMethods) {
-        setLinkedStatuses(result.linkedAuthMethods);
+  const fetchData = async () => {
+    if (fetching) return;
+    setFetching(true);
+    // Get cookies and CSRF token
+    const response = await chrome.runtime.sendMessage({
+      type: "GET_COOKIES",
+    });
+    if (response) {
+      setCookies(response);
+    }
+
+    // Get CSRF token
+    const csrfResponse = await chrome.runtime.sendMessage({
+      type: "GET_CSRF_TOKEN",
+    });
+    if (csrfResponse) {
+      setCsrfToken(csrfResponse);
+    }
+
+    // Get JWT tokens
+    const jwtResponse = await chrome.runtime.sendMessage({
+      type: "GET_JWT_TOKENS",
+    });
+    if (jwtResponse) {
+      setJwtTokens(jwtResponse);
+    }
+    setFetching(false);
+  };
+
+  const loadAll = async () => {
+    const profile = await chrome.identity.getProfileUserInfo({});
+    setProfileId(profile.id);
+    // Load linked statuses for this profile
+    chrome.storage.local.get([getStorageKey("linkedAuthMethods")], (result) => {
+      const key = getStorageKey("linkedAuthMethods");
+      if (result[key]) {
+        setLinkedStatuses(result[key]);
       }
     });
-
-    const fetchData = async () => {
-      // Get cookies and CSRF token
-      const response = await chrome.runtime.sendMessage({
-        type: "GET_COOKIES",
-      });
-      if (response) {
-        setCookies(response);
-      }
-
-      // Get CSRF token
-      const csrfResponse = await chrome.runtime.sendMessage({
-        type: "GET_CSRF_TOKEN",
-      });
-      if (csrfResponse) {
-        setCsrfToken(csrfResponse);
-      }
-
-      // Get JWT tokens
-      const jwtResponse = await chrome.runtime.sendMessage({
-        type: "GET_JWT_TOKENS",
-      });
-      if (jwtResponse) {
-        setJwtTokens(jwtResponse);
-      }
-    };
-
     fetchData();
+  };
+
+  useEffect(() => {
+    loadAll();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Update linked statuses when auth methods change
+  // DO NOT UPDATE LINKED STATUSES HERE
   useEffect(() => {
-    const newLinkedStatuses: { [key in EnumPlatform]?: number } = {};
-    authMethods.forEach((method) => {
-      if (method.active) {
-        newLinkedStatuses[method.platform] = method.id;
+    if (!profileId) return;
+    //when profile changes, refresh linked statuses
+    // Load linked statuses for this profile
+    chrome.storage.local.get([getStorageKey("linkedAuthMethods")], (result) => {
+      const key = getStorageKey("linkedAuthMethods");
+      if (result[key]) {
+        setLinkedStatuses(result[key]);
       }
     });
-    setLinkedStatuses(newLinkedStatuses);
-    chrome.storage.local.set({ linkedAuthMethods: newLinkedStatuses });
-  }, [authMethods]);
+  }, [profileId]);
 
   const sync = async (
     platform: EnumPlatform,
@@ -141,27 +154,46 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     }
   };
 
-  const openSyncDialog = (platform: EnumPlatform, token: string) => {
+  const openSyncDialog = (
+    platform: EnumPlatform,
+    token: string,
+    linkedId?: number
+  ) => {
     setSelectedPlatform(platform);
     setSelectedToken(token);
+    setSelectedAuthMethod(authMethods.find((m) => m.id === linkedId) || null);
     setDialogOpen(true);
   };
 
   const handleSync = async () => {
     if (!selectedPlatform || !selectedToken) return;
 
-    if (selectedAuthMethod) {
-      // Link to selected auth method
-      const newLinkedStatuses = {
-        ...linkedStatuses,
-        [selectedPlatform]: selectedAuthMethod.id,
-      };
-      setLinkedStatuses(newLinkedStatuses);
-      chrome.storage.local.set({ linkedAuthMethods: newLinkedStatuses });
-      toast.success("Linked successfully");
-    } else {
-      // Create new auth method
-      await sync(selectedPlatform, selectedToken);
+    try {
+      if (selectedAuthMethod) {
+        // Link to selected auth method
+        const newLinkedStatuses = {
+          ...linkedStatuses,
+          [selectedPlatform]: selectedAuthMethod.id,
+        };
+        setLinkedStatuses(newLinkedStatuses);
+        chrome.storage.local.set({
+          [getStorageKey("linkedAuthMethods")]: newLinkedStatuses,
+        });
+      }
+      // upsert new auth method
+      const success = await AuthService.sync(
+        selectedPlatform,
+        selectedToken,
+        selectedAuthMethod?.id
+      );
+      if (success) {
+        toast.success("Synced successfully");
+      } else {
+        toast.error("Sync failed");
+      }
+    } catch (error) {
+      console.error("sync error", error);
+      toast.error("Operation failed with uncaught error");
     }
 
     setDialogOpen(false);
@@ -182,10 +214,11 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       cookies["cookies_www.suitechsui.online"] ||
       cookies["cookies_www.binance.com"] ||
       [];
-    const str = toCopiedString(binanceCookies[0]?.value || "", csrfToken || "");
+    const p20t = binanceCookies.find((c) => c.name === "p20t")?.value;
+    const str = toCopiedString(p20t || "", csrfToken || "");
     const displayStr = toCopiedString(
-      obfuscate(binanceCookies[0]?.value) || "",
-      obfuscate(csrfToken) || ""
+      obfuscate(p20t || "") || "",
+      obfuscate(csrfToken || "") || ""
     );
     const linkedId = linkedStatuses[EnumPlatform.BINANCE];
     const linkedMethod = authMethods.find((m) => m.id === linkedId);
@@ -221,8 +254,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => openSyncDialog(EnumPlatform.BINANCE, str)}
-            disabled={!linked || !hasToken}
+            onClick={() => openSyncDialog(EnumPlatform.BINANCE, str, linkedId)}
+            disabled={!hasToken}
           >
             {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
@@ -270,8 +303,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
-            disabled={!linked || !hasToken}
-            onClick={() => openSyncDialog(EnumPlatform.OKX, okxToken)}
+            disabled={!hasToken}
+            onClick={() => openSyncDialog(EnumPlatform.OKX, okxToken, linkedId)}
           >
             {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
@@ -318,7 +351,10 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => openSyncDialog(EnumPlatform.BITGET, bitgetToken)}
+            disabled={!hasToken}
+            onClick={() =>
+              openSyncDialog(EnumPlatform.BITGET, bitgetToken, linkedId)
+            }
           >
             {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
@@ -411,7 +447,11 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               <Button variant="outline">Cancel</Button>
             </DialogClose>
             <Button onClick={handleSync}>
-              {selectedAuthMethod ? "Link" : "Create"}
+              {selectedAuthMethod && selectedToken
+                ? "Link & Sync"
+                : selectedAuthMethod
+                ? "Link"
+                : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
