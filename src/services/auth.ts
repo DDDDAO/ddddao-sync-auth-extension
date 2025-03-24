@@ -178,15 +178,23 @@ export class AuthService {
     }
   }
 
-  static async sync(platform: EnumPlatform, token: string): Promise<boolean> {
+  static async sync(
+    platform: EnumPlatform,
+    token: string,
+    linkedId?: number
+  ): Promise<boolean> {
     try {
       console.log("[AuthService] Syncing auth method:", platform, token);
       const response = await fetch(
         `${this.API_BASE_URL}/api/user-auth-methods`,
         {
-          method: "POST",
+          method: linkedId ? "PUT" : "POST",
           credentials: "include",
-          body: JSON.stringify({ platform, token }),
+          body: JSON.stringify({
+            id: linkedId,
+            platform,
+            value: token,
+          }),
           headers: {
             "Content-Type": "application/json",
           },

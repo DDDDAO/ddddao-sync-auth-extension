@@ -119,13 +119,17 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     chrome.storage.local.set({ linkedAuthMethods: newLinkedStatuses });
   }, [authMethods]);
 
-  const sync = async (platform: EnumPlatform, token: string) => {
+  const sync = async (
+    platform: EnumPlatform,
+    token: string,
+    linkedId?: number
+  ) => {
     try {
       if (!linkedStatuses[platform]) {
         toast.error("Please link an auth method first");
         return;
       }
-      const success = await AuthService.sync(platform, token);
+      const success = await AuthService.sync(platform, token, linkedId);
       if (success) {
         toast.success("Synced successfully");
       } else {
@@ -185,6 +189,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     );
     const linkedId = linkedStatuses[EnumPlatform.BINANCE];
     const linkedMethod = authMethods.find((m) => m.id === linkedId);
+    const linked = !!linkedId;
+    const hasToken = !!str;
 
     return (
       <Card>
@@ -207,8 +213,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => sync(EnumPlatform.BINANCE, str)}
-            disabled={!linkedId || !str}
+            onClick={() => sync(EnumPlatform.BINANCE, str, linkedId)}
+            disabled={!linked || !hasToken}
           >
             Sync
           </Button>
@@ -216,9 +222,9 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
             variant="outline"
             size="sm"
             onClick={() => openSyncDialog(EnumPlatform.BINANCE, str)}
-            disabled={!linkedId || !str}
+            disabled={!linked || !hasToken}
           >
-            {linkedId ? "Relink" : "Link"}
+            {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
         </CardFooter>
       </Card>
@@ -229,6 +235,9 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     const okxToken = jwtTokens["okx"] || "";
     const linkedId = linkedStatuses[EnumPlatform.OKX];
     const linkedMethod = authMethods.find((m) => m.id === linkedId);
+
+    const linked = !!linkedId;
+    const hasToken = !!okxToken;
 
     return (
       <Card>
@@ -253,18 +262,18 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => sync(EnumPlatform.OKX, okxToken)}
-            disabled={!linkedId || !okxToken}
+            onClick={() => sync(EnumPlatform.OKX, okxToken, linkedId)}
+            disabled={!linked || !hasToken}
           >
             Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!linkedId || !okxToken}
+            disabled={!linked || !hasToken}
             onClick={() => openSyncDialog(EnumPlatform.OKX, okxToken)}
           >
-            {linkedId ? "Relink" : "Link"}
+            {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
         </CardFooter>
       </Card>
@@ -276,6 +285,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     const linkedId = linkedStatuses[EnumPlatform.BITGET];
     const linkedMethod = authMethods.find((m) => m.id === linkedId);
 
+    const linked = !!linkedId;
+    const hasToken = !!bitgetToken;
     return (
       <Card>
         <CardHeader>
@@ -299,18 +310,17 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => sync(EnumPlatform.BITGET, bitgetToken)}
-            disabled={!linkedId || !bitgetToken}
+            onClick={() => sync(EnumPlatform.BITGET, bitgetToken, linkedId)}
+            disabled={!linked || !hasToken}
           >
             Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!linkedId || !bitgetToken}
             onClick={() => openSyncDialog(EnumPlatform.BITGET, bitgetToken)}
           >
-            {linkedId ? "Relink" : "Link"}
+            {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
         </CardFooter>
       </Card>
