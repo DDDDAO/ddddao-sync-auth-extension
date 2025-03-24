@@ -104,11 +104,11 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
   const loadAll = async () => {
     const profile = await chrome.identity.getProfileUserInfo({});
     setProfileId(profile.id);
+    console.log("[loadAll] Profile ID:", profile.id);
     // Load linked statuses for this profile
-    chrome.storage.local.get([getStorageKey("linkedAuthMethods")], (result) => {
-      const key = getStorageKey("linkedAuthMethods");
-      if (result[key]) {
-        setLinkedStatuses(result[key]);
+    chrome.storage.local.get(`${profile.id}:linkedAuthMethods`, (result) => {
+      if (result[`${profile.id}:linkedAuthMethods`]) {
+        setLinkedStatuses(result[`${profile.id}:linkedAuthMethods`]);
       }
     });
     fetchData();
@@ -119,37 +119,6 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  // DO NOT UPDATE LINKED STATUSES HERE
-  useEffect(() => {
-    if (!profileId || !authMethods.length) return;
-    //when profile changes, refresh linked statuses
-    // Load linked statuses for this profile
-    chrome.storage.local.get([getStorageKey("linkedAuthMethods")], (result) => {
-      const key = getStorageKey("linkedAuthMethods");
-      if (result[key]) {
-        console.log(
-          "[BackgroundFetchedCookiesOrJwtTokenList] Linked statuses:",
-          result[key]
-        );
-        // filter out auth methods that are not in the authMethods array
-        const filteredLinkedStatuses = Object.fromEntries(
-          Object.entries(result[key]).filter(([key]) =>
-            authMethods.some((m) => m.id === parseInt(key))
-          )
-        );
-        console.log(
-          "[BackgroundFetchedCookiesOrJwtTokenList] Filtered linked statuses:",
-          filteredLinkedStatuses
-        );
-        setLinkedStatuses(filteredLinkedStatuses);
-        // set back to chrome storage
-        chrome.storage.local.set({
-          [getStorageKey("linkedAuthMethods")]: filteredLinkedStatuses,
-        });
-      }
-    });
-  }, [profileId]);
 
   const sync = async (
     platform: EnumPlatform,
@@ -240,7 +209,9 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       obfuscate(csrfToken || "") || ""
     );
     const linkedId = linkedStatuses[EnumPlatform.BINANCE];
-    const linkedMethod = authMethods.find((m) => m.id === linkedId);
+    const linkedMethod = authMethods.find(
+      (m) => m.id === linkedId && m.platform === EnumPlatform.BINANCE
+    );
     const linked = !!linkedId;
     const hasToken = !!str;
 
@@ -287,7 +258,9 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
   const okxCard = () => {
     const okxToken = jwtTokens["okx"] || "";
     const linkedId = linkedStatuses[EnumPlatform.OKX];
-    const linkedMethod = authMethods.find((m) => m.id === linkedId);
+    const linkedMethod = authMethods.find(
+      (m) => m.id === linkedId && m.platform === EnumPlatform.OKX
+    );
 
     const linked = !!linkedId;
     const hasToken = !!okxToken;
@@ -337,7 +310,9 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
   const bitgetCard = () => {
     const bitgetToken = jwtTokens["bitget"] || "";
     const linkedId = linkedStatuses[EnumPlatform.BITGET];
-    const linkedMethod = authMethods.find((m) => m.id === linkedId);
+    const linkedMethod = authMethods.find(
+      (m) => m.id === linkedId && m.platform === EnumPlatform.BITGET
+    );
 
     const linked = !!linkedId;
     const hasToken = !!bitgetToken;
@@ -442,8 +417,9 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
             <Select
               value={selectedAuthMethod?.id?.toString()}
               onValueChange={(value) => {
+                const [id, platform] = value.split("-");
                 const method = authMethods.find(
-                  (m) => m.id.toString() === value
+                  (m) => m.id.toString() === id && m.platform === platform
                 );
                 setSelectedAuthMethod(method || null);
               }}
@@ -457,7 +433,10 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
                 {authMethods
                   .filter((method) => method.platform === selectedPlatform)
                   .map((method) => (
-                    <SelectItem key={method.id} value={method.id.toString()}>
+                    <SelectItem
+                      key={method.id}
+                      value={`${method.id}-${method.platform}`}
+                    >
                       {renderAuthMethodInfo(method)}
                     </SelectItem>
                   ))}
