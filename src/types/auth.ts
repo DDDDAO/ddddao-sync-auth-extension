@@ -7,6 +7,7 @@ export enum EnumPlatform {
   BINANCE = "Binance",
   OKX = "Okx",
   BITGET = "Bitget",
+  BYBIT = "Bybit",
 }
 
 export interface CookieMetadata {

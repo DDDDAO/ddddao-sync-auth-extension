@@ -17,6 +17,7 @@
     "*://*.okx.com/*",
     "*://*.bitget.com/*",
     "*://*.bitgetapps.com/*",
+    "*://*.bybit.com/*",
     "*://*.ddddao.top/*"
   ],
   "action": {

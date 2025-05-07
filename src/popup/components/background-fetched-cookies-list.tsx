@@ -101,6 +101,17 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     setFetching(false);
   };
 
+  // Function to manually trigger cookie fetch from current tab
+  const triggerCookieFetch = async () => {
+    await chrome.runtime.sendMessage({
+      type: "FETCH_COOKIES_NOW",
+    });
+
+    // Wait a moment then fetch the newly collected data
+    setTimeout(fetchData, 1000);
+    toast.success("Refreshing cookies from current tab");
+  };
+
   const loadAll = async () => {
     const profile = await chrome.identity.getProfileUserInfo({});
     setProfileId(profile.id);
@@ -375,6 +386,58 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     );
   };
 
+  const bybitCard = () => {
+    const bybitToken = jwtTokens["bybit"] || "";
+    const linkedId = linkedStatuses[EnumPlatform.BYBIT];
+    const linkedMethod = authMethods.find(
+      (m) => m.id === linkedId && m.platform === EnumPlatform.BYBIT
+    );
+    const linked = !!linkedId;
+    const hasToken = !!bybitToken;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Bybit</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="break-all">
+            {obfuscate(bybitToken) || "NO BYBIT TOKEN"}
+          </div>
+          {linkedMethod && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span className="text-green-400">Linked</span>
+              <div className="grid grid-cols-2 gap-2">
+                {col("ID", linkedMethod.id)}
+                {col("Nickname", linkedMethod.metadata["nickname"])}
+              </div>
+            </div>
+          )}
+          {bybitToken && <CopyButton contentToCopy={bybitToken} />}
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => sync(EnumPlatform.BYBIT, bybitToken, linkedId)}
+            disabled={!linked || !hasToken}
+          >
+            Sync
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasToken}
+            onClick={() =>
+              openSyncDialog(EnumPlatform.BYBIT, bybitToken, linkedId)
+            }
+          >
+            {hasToken ? (linked ? "Relink" : "Create") : "Link"}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
   const renderAuthMethodInfo = (
     method: DDCookie | null,
     singleLine = false
@@ -408,13 +471,24 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
 
   return (
     <div className="mb-4 space-y-4">
-      <p className="text-sm text-gray-500">
-        The cookies here are fetched from your current tab every 5 seconds.
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          The cookies here are fetched from your current tab every 5 seconds.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={triggerCookieFetch}
+          disabled={fetching}
+        >
+          {fetching ? "Refreshing..." : "Refresh Now"}
+        </Button>
+      </div>
       <div className="grid grid-cols-2 gap-4">
         {binanceCard()}
         {okxCard()}
         {bitgetCard()}
+        {bybitCard()}
       </div>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
