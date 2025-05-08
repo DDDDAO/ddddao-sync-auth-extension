@@ -2,7 +2,7 @@
 export const col = (top: any, bottom: any) => (
   <div className="flex flex-col justify-between">
     <div className="text-sm text-muted-foreground">{top}</div>
-    <div className="font-semibold">{bottom}</div>
+    <div className="font-semibold break-all flex-wrap">{bottom}</div>
   </div>
 );
 

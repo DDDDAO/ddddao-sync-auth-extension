@@ -116,35 +116,203 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     const profile = await chrome.identity.getProfileUserInfo({});
     setProfileId(profile.id);
     console.log("[loadAll] Profile ID:", profile.id);
+
     // Load linked statuses for this profile
     chrome.storage.local.get(`${profile.id}:linkedAuthMethods`, (result) => {
-      console.log("[loadAll] Linked statuses:", result);
-      if (result[`${profile.id}:linkedAuthMethods`]) {
-        // clear linked statuses whose id+platform is not in authMethods
-        const filteredLinkedStatuses = Object.fromEntries(
-          Object.entries(result[`${profile.id}:linkedAuthMethods`]).filter(
-            ([key]) => authMethods.some((m) => m.id === parseInt(key))
-          )
+      console.log("[loadAll] Linked statuses raw result:", result);
+      const linkedAuthMethods = result[`${profile.id}:linkedAuthMethods`];
+
+      if (linkedAuthMethods) {
+        console.log("[loadAll] Found linkedAuthMethods:", linkedAuthMethods);
+
+        // Convert string platform keys to numeric EnumPlatform values if needed
+        const parsedLinkedStatuses = Object.entries(linkedAuthMethods).reduce(
+          (acc, [platformKey, id]) => {
+            // If the key is a string representing a number, convert it to a number
+            const platform = isNaN(Number(platformKey))
+              ? platformKey
+              : Number(platformKey);
+            // Use type assertion to handle the EnumPlatform key type properly
+            acc[platform as unknown as EnumPlatform] = id as number;
+            return acc;
+          },
+          {} as { [key in EnumPlatform]?: number }
         );
+
+        console.log("[loadAll] Parsed linked statuses:", parsedLinkedStatuses);
+
+        // Log available auth methods for debugging
+        console.log(
+          "[loadAll] Available auth methods:",
+          authMethods.map((m) => ({ id: m.id, platform: m.platform }))
+        );
+
+        // Only filter out invalid entries if we actually have auth methods loaded
+        let filteredLinkedStatuses = parsedLinkedStatuses;
+
+        if (authMethods.length > 0) {
+          // Filter to only include auth methods that actually exist
+          filteredLinkedStatuses = Object.entries(parsedLinkedStatuses).reduce(
+            (acc, [platform, id]) => {
+              // Log each entry being checked
+              console.log(
+                `[loadAll] Checking if method exists - platform: ${platform}, id: ${id}`
+              );
+
+              const exists = authMethods.some((m) => {
+                const matches =
+                  m.id === id && m.platform.toString() === platform.toString();
+                console.log(
+                  `[loadAll] Auth method check - id: ${m.id}, platform: ${m.platform}, matches: ${matches}`
+                );
+                return matches;
+              });
+
+              if (exists) {
+                acc[platform as unknown as EnumPlatform] = id;
+              } else {
+                console.log(
+                  `[loadAll] Method not found: platform=${platform}, id=${id}`
+                );
+              }
+              return acc;
+            },
+            {} as { [key in EnumPlatform]?: number }
+          );
+        } else {
+          console.log(
+            "[loadAll] No auth methods available for filtering, keeping all linked statuses"
+          );
+        }
+
         console.log(
           "[loadAll] Filtered linked statuses:",
           filteredLinkedStatuses
         );
+
         setLinkedStatuses(filteredLinkedStatuses);
-        // set back to chrome storage
-        chrome.storage.local.set({
-          [`${profile.id}:linkedAuthMethods`]: filteredLinkedStatuses,
-        });
+
+        // Set back to chrome storage if needed (only if filtering removed items)
+        if (
+          Object.keys(filteredLinkedStatuses).length !==
+          Object.keys(parsedLinkedStatuses).length
+        ) {
+          chrome.storage.local.set(
+            {
+              [`${profile.id}:linkedAuthMethods`]: filteredLinkedStatuses,
+            },
+            () => {
+              console.log(
+                "[loadAll] Updated filtered linked statuses in storage"
+              );
+            }
+          );
+        }
+      } else {
+        console.log("[loadAll] No linked auth methods found in storage");
       }
     });
+
     fetchData();
   };
 
   useEffect(() => {
     loadAll();
     const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+
+    // Periodically check and restore linked statuses to ensure persistence
+    const persistenceInterval = setInterval(() => {
+      if (profileId) {
+        // Read from storage and update state if needed
+        ensureLinkedStatusesPersistence();
+      }
+    }, 10000); // Check every 10 seconds
+
+    // Debug: Check local storage for linked methods
+    checkLocalStorage();
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(persistenceInterval);
+
+      // Save linkedStatuses one last time before unmounting
+      if (profileId && Object.keys(linkedStatuses).length > 0) {
+        console.log(
+          "[cleanup] Saving linked statuses before unmount:",
+          linkedStatuses
+        );
+        chrome.storage.local.set({
+          [`${profileId}:linkedAuthMethods`]: linkedStatuses,
+        });
+      }
+    };
   }, []);
+
+  // Make sure linkedStatuses are persisted by periodically checking storage
+  const ensureLinkedStatusesPersistence = () => {
+    console.log("[persistence] Ensuring linked statuses persistence");
+
+    // Check current storage
+    chrome.storage.local.get(`${profileId}:linkedAuthMethods`, (result) => {
+      const storedLinkedStatuses = result[`${profileId}:linkedAuthMethods`];
+      console.log(
+        "[persistence] Current stored linked statuses:",
+        storedLinkedStatuses
+      );
+      console.log(
+        "[persistence] Current state linked statuses:",
+        linkedStatuses
+      );
+
+      // If we have statuses in state but not in storage, restore them
+      if (
+        Object.keys(linkedStatuses).length > 0 &&
+        (!storedLinkedStatuses ||
+          Object.keys(storedLinkedStatuses).length === 0)
+      ) {
+        console.log(
+          "[persistence] Restoring linked statuses to storage:",
+          linkedStatuses
+        );
+        chrome.storage.local.set({
+          [`${profileId}:linkedAuthMethods`]: linkedStatuses,
+        });
+      }
+
+      // If we have statuses in storage but not in state, restore them to state
+      if (
+        (!linkedStatuses || Object.keys(linkedStatuses).length === 0) &&
+        storedLinkedStatuses &&
+        Object.keys(storedLinkedStatuses).length > 0
+      ) {
+        console.log(
+          "[persistence] Restoring linked statuses to state from storage:",
+          storedLinkedStatuses
+        );
+        setLinkedStatuses(storedLinkedStatuses);
+      }
+    });
+  };
+
+  // Debug function to check local storage for linked methods
+  const checkLocalStorage = () => {
+    chrome.storage.local.get(null, (result) => {
+      console.log("[DEBUG] All chrome.storage.local data:", result);
+
+      // Find all linkedAuthMethods entries
+      const linkedEntries = Object.entries(result).filter(([key]) =>
+        key.includes("linkedAuthMethods")
+      );
+
+      console.log("[DEBUG] All linkedAuthMethods entries:", linkedEntries);
+
+      if (profileId) {
+        const profileKey = `${profileId}:linkedAuthMethods`;
+        console.log("[DEBUG] Looking specifically for:", profileKey);
+        console.log("[DEBUG] Found:", result[profileKey]);
+      }
+    });
+  };
 
   const sync = async (
     platform: EnumPlatform,
@@ -152,11 +320,21 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     linkedId?: number
   ) => {
     try {
-      if (!linkedStatuses[platform]) {
+      // Debug output for current linkedStatuses
+      console.log("[sync] Current linkedStatuses:", linkedStatuses);
+      console.log("[sync] Platform:", platform, "LinkedId:", linkedId);
+
+      // Check if platform is linked
+      if (!linkedId && !linkedStatuses[platform]) {
         toast.error("Please link an auth method first");
         return;
       }
-      const success = await AuthService.sync(platform, token, linkedId);
+
+      // Use the linkedId from linkedStatuses if not provided
+      const idToUse = linkedId || linkedStatuses[platform];
+      console.log("[sync] Using ID for sync:", idToUse);
+
+      const success = await AuthService.sync(platform, token, idToUse);
       if (success) {
         toast.success("Synced successfully");
       } else {
@@ -173,9 +351,52 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     token: string,
     linkedId?: number
   ) => {
+    console.log("[openSyncDialog] Opening dialog", {
+      platform,
+      token,
+      linkedId,
+    });
+
+    // First set the platform and token
     setSelectedPlatform(platform);
     setSelectedToken(token);
-    setSelectedAuthMethod(authMethods.find((m) => m.id === linkedId) || null);
+
+    // Find the appropriate auth method
+    let authMethod: DDCookie | null = null;
+    if (linkedId) {
+      // If linkedId is provided, use that
+      const foundMethod = authMethods.find(
+        (m) => m.id === linkedId && m.platform === platform
+      );
+      if (foundMethod) {
+        authMethod = foundMethod;
+      }
+      console.log(
+        "[openSyncDialog] Found auth method by linkedId:",
+        authMethod
+      );
+    } else {
+      // Check if there's an existing linked status
+      const existingId = linkedStatuses[platform];
+      if (existingId) {
+        const foundMethod = authMethods.find(
+          (m) => m.id === existingId && m.platform === platform
+        );
+        if (foundMethod) {
+          authMethod = foundMethod;
+        }
+        console.log(
+          "[openSyncDialog] Found auth method by existing link:",
+          authMethod
+        );
+      }
+    }
+
+    // TypeScript needs assurance that this is the correct type
+    setSelectedAuthMethod(authMethod);
+    console.log("[openSyncDialog] Selected auth method set to:", authMethod);
+
+    // Open the dialog
     setDialogOpen(true);
   };
 
@@ -183,6 +404,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     if (!selectedPlatform || !selectedToken) return;
 
     try {
+      // Store existing auth method link if selected
       if (selectedAuthMethod) {
         // Link to selected auth method
         const newLinkedStatuses = {
@@ -190,18 +412,123 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           [selectedPlatform]: selectedAuthMethod.id,
         };
         setLinkedStatuses(newLinkedStatuses);
-        chrome.storage.local.set({
-          [getStorageKey("linkedAuthMethods")]: newLinkedStatuses,
+
+        // Fix: Log what we're about to store
+        console.log("[handleSync] Storing linked auth methods:", {
+          key: `${profileId}:linkedAuthMethods`,
+          value: newLinkedStatuses,
         });
+
+        // Ensure we're using the correct key format
+        chrome.storage.local.set(
+          {
+            [`${profileId}:linkedAuthMethods`]: newLinkedStatuses,
+          },
+          () => {
+            // Add callback to verify storage operation
+            console.log("[handleSync] Successfully stored linked auth methods");
+            // Double-check what was stored
+            chrome.storage.local.get(
+              `${profileId}:linkedAuthMethods`,
+              (result) => {
+                console.log(
+                  "[handleSync] Verification of stored data:",
+                  result
+                );
+              }
+            );
+
+            // Also verify all storage
+            chrome.storage.local.get(null, (result) => {
+              console.log("[handleSync] All storage:", result);
+
+              // Find all entries with linkedAuthMethods
+              const linkedEntries = Object.entries(result).filter(([key]) =>
+                key.includes("linkedAuthMethods")
+              );
+              console.log(
+                "[handleSync] All linkedAuthMethods entries:",
+                linkedEntries
+              );
+            });
+          }
+        );
       }
-      // upsert new auth method
+
+      // Create or update auth method
       const success = await AuthService.sync(
         selectedPlatform,
         selectedToken,
         selectedAuthMethod?.id
       );
+
       if (success) {
         toast.success("Synced successfully");
+
+        // If this was a creation (no selectedAuthMethod), we need to fetch the newly created method's ID
+        if (!selectedAuthMethod) {
+          try {
+            console.log(
+              "[handleSync] Creation successful, fetching auth methods to get ID"
+            );
+            const authMethodsResponse = await AuthService.getAuthMethods();
+            if (authMethodsResponse && authMethodsResponse.data) {
+              // Find the most recently created method for this platform
+              const newMethods = authMethodsResponse.data.filter(
+                (m) => m.platform === selectedPlatform
+              );
+
+              if (newMethods.length > 0) {
+                // Sort by creation date, most recent first (if available)
+                // or just use the last one in the array
+                const latestMethod = newMethods[newMethods.length - 1];
+                console.log(
+                  "[handleSync] Found latest method for platform:",
+                  latestMethod
+                );
+
+                // Update linked statuses with the new method
+                const updatedLinkedStatuses = {
+                  ...linkedStatuses,
+                  [selectedPlatform]: latestMethod.id,
+                };
+
+                console.log(
+                  "[handleSync] Updating linked statuses after creation:",
+                  updatedLinkedStatuses
+                );
+                setLinkedStatuses(updatedLinkedStatuses);
+
+                // Store in chrome storage - critical for persistence!
+                chrome.storage.local.set(
+                  {
+                    [`${profileId}:linkedAuthMethods`]: updatedLinkedStatuses,
+                  },
+                  () => {
+                    console.log(
+                      "[handleSync] Successfully stored updated linked statuses after creation"
+                    );
+                    // Verify storage
+                    chrome.storage.local.get(
+                      `${profileId}:linkedAuthMethods`,
+                      (result) => {
+                        console.log(
+                          "[handleSync] Verification after creation:",
+                          result
+                        );
+                      }
+                    );
+                  }
+                );
+              }
+            }
+          } catch (error) {
+            console.error(
+              "[handleSync] Error updating linked status after creation:",
+              error
+            );
+          }
+        }
       } else {
         toast.error("Sync failed");
       }
@@ -248,6 +575,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
         </CardHeader>
         <CardContent>
           <div className="text-xs break-all">{displayStr}</div>
+          {str && <CopyButton contentToCopy={str} />}
           {linkedMethod && (
             <div className="mt-2 text-xs text-muted-foreground">
               <span className="text-green-400">Linked</span>
@@ -257,7 +585,6 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
-          {str && <CopyButton contentToCopy={str} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
@@ -300,6 +627,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <div className="break-all">
             {obfuscate(okxToken) || "NO OKX TOKEN"}
           </div>
+          {okxToken && <CopyButton contentToCopy={okxToken} />}
           {linkedMethod && (
             <div className="mt-2 text-xs text-muted-foreground">
               <span className="text-green-400">Linked</span>
@@ -309,7 +637,6 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
-          {okxToken && <CopyButton contentToCopy={okxToken} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
@@ -351,6 +678,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <div className="break-all">
             {obfuscate(bitgetToken) || "NO BITGET TOKEN"}
           </div>
+          {bitgetToken && <CopyButton contentToCopy={bitgetToken} />}
           {linkedMethod && (
             <div className="mt-2 text-xs text-muted-foreground">
               <span className="text-green-400">Linked</span>
@@ -360,7 +688,6 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
-          {bitgetToken && <CopyButton contentToCopy={bitgetToken} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
@@ -403,6 +730,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <div className="break-all">
             {obfuscate(bybitToken) || "NO BYBIT TOKEN"}
           </div>
+          {bybitToken && <CopyButton contentToCopy={bybitToken} />}
+
           {linkedMethod && (
             <div className="mt-2 text-xs text-muted-foreground">
               <span className="text-green-400">Linked</span>
@@ -412,7 +741,6 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
               </div>
             </div>
           )}
-          {bybitToken && <CopyButton contentToCopy={bybitToken} />}
         </CardContent>
         <CardFooter className="flex gap-2">
           <Button
@@ -475,14 +803,26 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
         <p className="text-sm text-gray-500">
           The cookies here are fetched from your current tab every 5 seconds.
         </p>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={triggerCookieFetch}
-          disabled={fetching}
-        >
-          {fetching ? "Refreshing..." : "Refresh Now"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={triggerCookieFetch}
+            disabled={fetching}
+          >
+            {fetching ? "Refreshing..." : "Refresh Now"}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              checkLocalStorage();
+              loadAll();
+            }}
+          >
+            Debug
+          </Button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         {binanceCard()}
