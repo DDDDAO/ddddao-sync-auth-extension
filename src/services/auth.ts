@@ -13,7 +13,7 @@ export class AuthService {
   private static debouncedLogFunction = debounce(
     (platform: EnumPlatform, token: string, linkedId?: number) => {
       console.log("debounceSync", platform, token, linkedId);
-      return true; // Return true directly, not a Promise
+      return this.sync(platform, token, linkedId);
     },
     1000
   );
