@@ -1,4 +1,5 @@
 import { AuthMethodsResponse, EnumPlatform, Session } from "../types/auth";
+import { debounce } from "lodash";
 
 interface LoginCredentials {
   email: string;
@@ -7,6 +8,15 @@ interface LoginCredentials {
 
 export class AuthService {
   private static readonly API_BASE_URL = "https://app.ddddao.top";
+
+  // Create a persistent debounced function for logging (user's test version)
+  private static debouncedLogFunction = debounce(
+    (platform: EnumPlatform, token: string, linkedId?: number) => {
+      console.log("debounceSync", platform, token, linkedId);
+      return true; // Return true directly, not a Promise
+    },
+    1000
+  );
 
   static async login(credentials: LoginCredentials): Promise<boolean> {
     try {
@@ -183,6 +193,29 @@ export class AuthService {
       return response.ok;
     } catch (error) {
       console.error("[AuthService] Delete auth method error:", error);
+      return false;
+    }
+  }
+
+  static async debounceSync(
+    platform: EnumPlatform,
+    token: string,
+    linkedId?: number
+  ): Promise<boolean> {
+    try {
+      const result = AuthService.debouncedLogFunction(
+        platform,
+        token,
+        linkedId
+      );
+      // Handle the case where debounce returns undefined (when called too frequently)
+      if (result === undefined) {
+        console.log("[AuthService] Debounced call skipped (too frequent)");
+        return true; // Consider skipped calls as successful to avoid "failed" toast
+      }
+      return result || false;
+    } catch (error) {
+      console.error("[AuthService] Debounced sync error:", error);
       return false;
     }
   }

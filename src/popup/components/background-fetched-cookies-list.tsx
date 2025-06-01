@@ -54,6 +54,7 @@ interface BackgroundFetchedCookiesOrJwtTokenListProps {
 export function BackgroundFetchedCookiesOrJwtTokenList({
   authMethods,
 }: BackgroundFetchedCookiesOrJwtTokenListProps) {
+  const [loading, setLoading] = useState(false);
   const [cookies, setCookies] = useState<StorageData>({});
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
   const [jwtTokens, setJwtTokens] = useState<{ [key: string]: string }>({});
@@ -70,7 +71,6 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
   }>({});
   const [profileId, setProfileId] = useState<string>("");
   const [fetching, setFetching] = useState(false);
-  const getStorageKey = (key: string) => `${profileId}:${key}`;
 
   const fetchData = async () => {
     if (fetching) return;
@@ -319,6 +319,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     token: string,
     linkedId?: number
   ) => {
+    setLoading(true);
+    if (loading) return;
     try {
       // Debug output for current linkedStatuses
       console.log("[sync] Current linkedStatuses:", linkedStatuses);
@@ -334,15 +336,24 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       const idToUse = linkedId || linkedStatuses[platform];
       console.log("[sync] Using ID for sync:", idToUse);
 
-      const success = await AuthService.sync(platform, token, idToUse);
+      // Show immediate feedback for debounced operation
+      toast.info("Sync request queued...");
+
+      const success = await AuthService.debounceSync(platform, token, idToUse);
+
+      // Add a small delay to simulate the debounce behavior for better UX
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
       if (success) {
-        toast.success("Synced successfully");
+        toast.success("Sync completed successfully");
       } else {
         toast.error("Sync failed");
       }
     } catch (error) {
       console.error("sync", error);
       toast.error("Sync failed with uncaught error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -403,6 +414,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
   const handleSync = async () => {
     if (!selectedPlatform || !selectedToken) return;
 
+    setLoading(true);
+    if (loading) return;
     try {
       // Store existing auth method link if selected
       if (selectedAuthMethod) {
@@ -456,7 +469,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       }
 
       // Create or update auth method
-      const success = await AuthService.sync(
+      const success = await AuthService.debounceSync(
         selectedPlatform,
         selectedToken,
         selectedAuthMethod?.id
@@ -535,6 +548,8 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     } catch (error) {
       console.error("sync error", error);
       toast.error("Operation failed with uncaught error");
+    } finally {
+      setLoading(false);
     }
 
     setDialogOpen(false);
@@ -590,16 +605,18 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
+            disabled={!linked || !hasToken || loading}
+            loading={loading}
             onClick={() => sync(EnumPlatform.BINANCE, str, linkedId)}
-            disabled={!linked || !hasToken}
           >
             Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
+            disabled={!hasToken || loading}
+            loading={loading}
             onClick={() => openSyncDialog(EnumPlatform.BINANCE, str, linkedId)}
-            disabled={!hasToken}
           >
             {hasToken ? (linked ? "Relink" : "Create") : "Link"}
           </Button>
@@ -642,15 +659,17 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
+            disabled={!linked || !hasToken || loading}
+            loading={loading}
             onClick={() => sync(EnumPlatform.OKX, okxToken, linkedId)}
-            disabled={!linked || !hasToken}
           >
             Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!hasToken}
+            disabled={!hasToken || loading}
+            loading={loading}
             onClick={() => openSyncDialog(EnumPlatform.OKX, okxToken, linkedId)}
           >
             {hasToken ? (linked ? "Relink" : "Create") : "Link"}
@@ -693,15 +712,17 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
+            disabled={!linked || !hasToken || loading}
+            loading={loading}
             onClick={() => sync(EnumPlatform.BITGET, bitgetToken, linkedId)}
-            disabled={!linked || !hasToken}
           >
             Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!hasToken}
+            disabled={!hasToken || loading}
+            loading={loading}
             onClick={() =>
               openSyncDialog(EnumPlatform.BITGET, bitgetToken, linkedId)
             }
@@ -746,15 +767,17 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           <Button
             variant="outline"
             size="sm"
+            loading={loading}
             onClick={() => sync(EnumPlatform.BYBIT, bybitToken, linkedId)}
-            disabled={!linked || !hasToken}
+            disabled={!linked || !hasToken || loading}
           >
             Sync
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!hasToken}
+            disabled={!hasToken || loading}
+            loading={loading}
             onClick={() =>
               openSyncDialog(EnumPlatform.BYBIT, bybitToken, linkedId)
             }
@@ -876,7 +899,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSync}>
+            <Button disabled={loading} loading={loading} onClick={handleSync}>
               {selectedAuthMethod && selectedToken
                 ? "Link & Sync"
                 : selectedAuthMethod

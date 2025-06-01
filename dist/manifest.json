@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DDDDAO Auth Sync",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Sync authentication cookies with DDDDAO platform",
   "permissions": [
     "cookies",

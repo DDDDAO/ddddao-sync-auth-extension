@@ -1,0 +1,6 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+Use Yarn for command line runs.
