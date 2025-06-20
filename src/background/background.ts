@@ -37,7 +37,9 @@ function fetchCookiesForCurrentTab() {
         domain.includes("okx.com") ||
         domain.includes("bitget.com") ||
         domain.includes("bitgetapps.com") ||
-        domain.includes("bybit.com")
+        domain.includes("bybit.com") ||
+        domain.includes("gate.io") ||
+        domain.includes("gate.com")
       ) {
         fetchCookiesForDomain(domain);
       } else {
@@ -89,6 +91,14 @@ function fetchCookiesForDomain(domain: string) {
     }
     console.log("Cookies for domain:", domain, cookies);
 
+    // Debug: Log all cookie names for this domain
+    console.log(
+      "Cookie names for",
+      domain,
+      ":",
+      cookies.map((c) => c.name)
+    );
+
     // Store all cookies
     chrome.storage.local.set({ [`cookies_${domain}`]: cookies }, function () {
       console.log(`Cookies for ${domain} saved to storage`);
@@ -123,6 +133,21 @@ function fetchCookiesForDomain(domain: string) {
       if (jwtCookie) {
         console.log("Bybit JWT Token Found in cookies");
         chrome.storage.local.set({ bybit_jwt: jwtCookie.value });
+      }
+    } else if (domain.includes("gate")) {
+      console.log("Processing Gate domain:", domain);
+      console.log(
+        "Looking for 'token' cookie in:",
+        cookies.map((c) => c.name)
+      );
+      const jwtCookie = cookies.find((cookie) => cookie.name === "token");
+      if (jwtCookie) {
+        console.log("Gate JWT Token Found in cookies:", jwtCookie.value);
+        chrome.storage.local.set({ gate_jwt: jwtCookie.value }, () => {
+          console.log("Gate JWT token saved to storage");
+        });
+      } else {
+        console.log("No 'token' cookie found for Gate domain");
       }
     }
   });
@@ -166,6 +191,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // Check for Bybit JWT token
       if (items.bybit_jwt) {
         jwtTokens["bybit"] = items.bybit_jwt;
+      }
+
+      // Check for Gate JWT token
+      if (items.gate_jwt) {
+        jwtTokens["gate"] = items.gate_jwt;
       }
 
       sendResponse(jwtTokens);
@@ -217,7 +247,9 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
       details.url.includes("okx.com") ||
       details.url.includes("bitget.com") ||
       details.url.includes("bitgetapps.com") ||
-      details.url.includes("bybit.com")
+      details.url.includes("bybit.com") ||
+      details.url.includes("gate.io") ||
+      details.url.includes("gate.com")
     ) {
       fetchCookiesForCurrentTab();
     }
@@ -232,6 +264,12 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
       "https://www.bybit.com/*",
       "https://*.bybit.com/*",
       "https://bybit.com/*",
+      "https://www.gate.io/*",
+      "https://*.gate.io/*",
+      "https://gate.io/*",
+      "https://www.gate.com/*",
+      "https://*.gate.com/*",
+      "https://gate.com/*",
     ],
   },
   ["requestHeaders"]

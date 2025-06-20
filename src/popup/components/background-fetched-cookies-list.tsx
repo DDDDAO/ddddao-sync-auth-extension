@@ -103,6 +103,14 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
 
   // Function to manually trigger cookie fetch from current tab
   const triggerCookieFetch = async () => {
+    // Get current tab info for debugging
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0]?.url) {
+      console.log("[triggerCookieFetch] Current tab URL:", tabs[0].url);
+      const domain = new URL(tabs[0].url).hostname;
+      console.log("[triggerCookieFetch] Current domain:", domain);
+    }
+
     await chrome.runtime.sendMessage({
       type: "FETCH_COOKIES_NOW",
     });
@@ -305,6 +313,24 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       );
 
       console.log("[DEBUG] All linkedAuthMethods entries:", linkedEntries);
+
+      // Check for JWT tokens
+      const jwtEntries = Object.entries(result).filter(([key]) =>
+        key.includes("jwt")
+      );
+      console.log("[DEBUG] All JWT token entries:", jwtEntries);
+
+      // Check for Gate-specific data
+      const gateEntries = Object.entries(result).filter(([key]) =>
+        key.toLowerCase().includes("gate")
+      );
+      console.log("[DEBUG] All Gate-related entries:", gateEntries);
+
+      // Check for cookies from Gate domains
+      const gateCookieEntries = Object.entries(result).filter(
+        ([key]) => key.includes("cookies_") && key.includes("gate")
+      );
+      console.log("[DEBUG] Gate cookie entries:", gateCookieEntries);
 
       if (profileId) {
         const profileKey = `${profileId}:linkedAuthMethods`;
@@ -789,6 +815,61 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
     );
   };
 
+  const gateCard = () => {
+    const gateToken = jwtTokens["gate"] || "";
+    const linkedId = linkedStatuses[EnumPlatform.GATE];
+    const linkedMethod = authMethods.find(
+      (m) => m.id === linkedId && m.platform === EnumPlatform.GATE
+    );
+    const linked = !!linkedId;
+    const hasToken = !!gateToken;
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Gate.io</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="break-all">
+            {obfuscate(gateToken) || "NO GATE TOKEN"}
+          </div>
+          {gateToken && <CopyButton contentToCopy={gateToken} />}
+          {linkedMethod && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span className="text-green-400">Linked</span>
+              <div className="grid grid-cols-2 gap-2">
+                {col("ID", linkedMethod.id)}
+                {col("Nickname", linkedMethod.metadata["nickname"])}
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!linked || !hasToken || loading}
+            loading={loading}
+            onClick={() => sync(EnumPlatform.GATE, gateToken, linkedId)}
+          >
+            Sync
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasToken || loading}
+            loading={loading}
+            onClick={() =>
+              openSyncDialog(EnumPlatform.GATE, gateToken, linkedId)
+            }
+          >
+            {hasToken ? (linked ? "Relink" : "Create") : "Link"}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  };
+
   const renderAuthMethodInfo = (
     method: DDCookie | null,
     singleLine = false
@@ -852,6 +933,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
         {okxCard()}
         {bitgetCard()}
         {bybitCard()}
+        {gateCard()}
       </div>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
