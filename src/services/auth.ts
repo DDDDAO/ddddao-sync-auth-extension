@@ -15,7 +15,8 @@ export class AuthService {
       console.log("debounceSync", platform, token, linkedId);
       return this.sync(platform, token, linkedId);
     },
-    1000
+    1000,
+    { leading: true, trailing: false }
   );
 
   static async login(credentials: LoginCredentials): Promise<boolean> {
@@ -201,7 +202,7 @@ export class AuthService {
     platform: EnumPlatform,
     token: string,
     linkedId?: number
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; message?: string }> {
     try {
       const result = AuthService.debouncedLogFunction(
         platform,
@@ -211,12 +212,16 @@ export class AuthService {
       // Handle the case where debounce returns undefined (when called too frequently)
       if (result === undefined) {
         console.log("[AuthService] Debounced call skipped (too frequent)");
-        return true; // Consider skipped calls as successful to avoid "failed" toast
+        return {
+          success: false,
+          message: "Request rate limited - please wait before trying again",
+        };
       }
-      return result || false;
+      // Since result is a Promise<{success: boolean, message?: string}>, we need to await it
+      return await result;
     } catch (error) {
       console.error("[AuthService] Debounced sync error:", error);
-      return false;
+      return { success: false, message: "Debounced sync error occurred" };
     }
   }
 
@@ -224,7 +229,7 @@ export class AuthService {
     platform: EnumPlatform,
     token: string,
     linkedId?: number
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; message?: string }> {
     try {
       console.log("[AuthService] Syncing auth method:", platform, token);
       const payload = {
@@ -255,12 +260,12 @@ export class AuthService {
       const data = await response.json();
       console.log("[AuthService] Sync auth method response data:", data);
       if (data.success) {
-        return true;
+        return { success: true };
       }
-      return false;
+      return { success: false, message: data.message };
     } catch (error) {
       console.error("[AuthService] Sync error:", error);
-      return false;
+      return { success: false, message: "Network error occurred" };
     }
   }
 }

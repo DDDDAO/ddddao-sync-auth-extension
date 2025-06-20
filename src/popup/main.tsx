@@ -7,7 +7,7 @@ import { Toaster } from "sonner";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <div>
-      <Toaster position="top-right" duration={2000} richColors />
+      <Toaster position="top-right" duration={5000} richColors />
       <Popup />
     </div>
   </React.StrictMode>

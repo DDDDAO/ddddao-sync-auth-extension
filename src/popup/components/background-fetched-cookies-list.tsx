@@ -42,11 +42,6 @@ interface StorageData {
   [key: string]: Cookie[];
 }
 
-interface JwtToken {
-  token: string;
-  domain: string;
-}
-
 interface BackgroundFetchedCookiesOrJwtTokenListProps {
   authMethods: DDCookie[];
 }
@@ -365,15 +360,15 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       // Show immediate feedback for debounced operation
       toast.info("Sync request queued...");
 
-      const success = await AuthService.debounceSync(platform, token, idToUse);
+      const result = await AuthService.debounceSync(platform, token, idToUse);
 
       // Add a small delay to simulate the debounce behavior for better UX
       await new Promise((resolve) => setTimeout(resolve, 1200));
 
-      if (success) {
+      if (result.success) {
         toast.success("Sync completed successfully");
       } else {
-        toast.error("Sync failed");
+        toast.error(result.message || "Sync failed");
       }
     } catch (error) {
       console.error("sync", error);
@@ -495,13 +490,13 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
       }
 
       // Create or update auth method
-      const success = await AuthService.debounceSync(
+      const result = await AuthService.debounceSync(
         selectedPlatform,
         selectedToken,
         selectedAuthMethod?.id
       );
 
-      if (success) {
+      if (result.success) {
         toast.success("Synced successfully");
 
         // If this was a creation (no selectedAuthMethod), we need to fetch the newly created method's ID
@@ -569,7 +564,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           }
         }
       } else {
-        toast.error("Sync failed");
+        toast.error(result.message || "Sync failed");
       }
     } catch (error) {
       console.error("sync error", error);
@@ -928,7 +923,7 @@ export function BackgroundFetchedCookiesOrJwtTokenList({
           </Button>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 min-w-[450px]">
         {binanceCard()}
         {okxCard()}
         {bitgetCard()}
