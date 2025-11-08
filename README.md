@@ -1,4 +1,4 @@
-# ddddao-sync-auth-extension
+# dddd-sync-auth-extension
 
 A chrome extension to sync cookies to our platform
 

@@ -1,11 +1,11 @@
 {
-  "name": "ddddao-sync-auth-extension",
+  "name": "dddd-sync-auth-extension",
   "version": "1.0.0",
-  "description": "DDDDAO Authentication Sync Extension",
+  "description": "DDDD Authentication Sync Extension",
   "type": "module",
   "scripts": {
     "generate-icons": "node scripts/generate-icons.js",
-    "prebuild": "yarn generate-icons",
+    "prebuild": "node scripts/generate-icons.js",
     "build": "tsc && vite build",
     "dev": "tsc && vite build --watch",
     "check": "tsc --noEmit"

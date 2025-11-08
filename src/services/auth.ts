@@ -7,7 +7,7 @@ interface LoginCredentials {
 }
 
 export class AuthService {
-  private static readonly API_BASE_URL = "https://app.ddddao.top";
+  private static readonly API_BASE_URL = "https://ddddapp.com";
 
   // Create a persistent debounced function for logging (user's test version)
   private static debouncedLogFunction = debounce(
@@ -78,7 +78,7 @@ export class AuthService {
       console.log("[AuthService] Logout response status:", response.status);
 
       // Clear all cookies for the domain
-      const cookies = await chrome.cookies.getAll({ domain: "ddddao.top" });
+      const cookies = await chrome.cookies.getAll({ domain: "ddddapp.com" });
       console.log("[AuthService] Found cookies to remove:", cookies.length);
 
       for (const cookie of cookies) {

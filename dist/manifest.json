@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DDDDAO Auth Sync",
+  "name": "DDDD Auth Sync",
   "version": "1.3.0",
-  "description": "Sync authentication cookies with DDDDAO platform",
+  "description": "Sync authentication cookies with DDDD platform",
   "permissions": [
     "cookies",
     "storage",
@@ -20,7 +20,7 @@
     "*://*.bybit.com/*",
     "*://*.gate.com/*",
     "*://*.gate.io/*",
-    "*://*.ddddao.top/*"
+    "*://*.ddddapp.com/*"
   ],
   "action": {
     "default_popup": "src/popup/index.html",
